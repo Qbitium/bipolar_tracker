@@ -58,7 +58,7 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(243, 242, 238, 0.76);
+      background: rgba(243, 242, 238, 0.82);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       border-bottom: 1px solid rgba(17, 17, 17, 0.06);
@@ -103,8 +103,13 @@
     }
     .save-indicator.ok {
       color: var(--ink);
-      background: rgba(255, 255, 255, 0.75);
+      background: rgba(255, 255, 255, 0.82);
       border-color: var(--border);
+    }
+    .save-indicator.cloud {
+      color: #1d4ed8;
+      background: rgba(37, 99, 235, 0.1);
+      border-color: rgba(37, 99, 235, 0.28);
     }
 
     /* Вкладки-капсулы */
@@ -133,7 +138,7 @@
       color: var(--ink);
     }
     .tab-btn.active {
-      background: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.92);
       color: var(--ink);
       border: 1.5px solid var(--ink);
       box-shadow: 0 4px 12px -4px rgba(17, 17, 17, 0.12);
@@ -218,7 +223,7 @@
       outline: none;
     }
     .zero-btn {
-      background: rgba(255, 255, 255, 0.75);
+      background: rgba(255, 255, 255, 0.78);
       color: var(--ink);
       border: 1.2px solid var(--border);
       padding: 9px 16px;
@@ -469,7 +474,7 @@
       letter-spacing: -0.04em;
       font-variant-numeric: tabular-nums;
       margin-top: 6px;
-      color: var(--ink) !important;
+      color: var(--ink);
     }
 
     /* График NIMH — темная контрастная панель */
@@ -558,7 +563,7 @@
       <span>🧠 BAR-2 LifeChart</span>
       <span class="brand-badge">NIMH + IPSRT</span>
     </div>
-    <div id="saveBadge" class="save-indicator">⚠️ Скрипты заблокированы просмотрщиком (откройте в браузере)</div>
+    <div id="saveBadge" class="save-indicator">⏳ Загрузка скрипта...</div>
   </div>
   <nav class="nav-tabs no-print">
     <button type="button" class="tab-btn active" data-tab="checkin">⚡ Чек-ин (15 сек)</button>
@@ -756,7 +761,7 @@
     <div class="card no-print">
       <div class="card-header">
         <div>
-          <div class="card-title">🗂️ Экспорт для врача и управление локальной базой</div>
+          <div class="card-title">🗂️ Экспорт для врача и управление базой</div>
           <div class="card-subtitle">Выгрузка клинических отчетов, резервное копирование и очистка демо-данных</div>
         </div>
       </div>
@@ -802,21 +807,34 @@
 
 <script>
 (function() {
-  // ========================================================================
-  // ИНИЦИАЛИЗАЦИЯ TELEGRAM MINI APP И ГИБРИДНОГО ХРАНИЛИЩА (CLOUD + LOCAL)
-  // ========================================================================
-  const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
-  // Проверяем, что приложение действительно открыто внутри Telegram и поддерживает CloudStorage (v6.9+)
-  const isTelegramCloud = Boolean(
-    tg &&
-    tg.initData &&
-    tg.initData.length > 0 &&
-    tg.CloudStorage &&
-    typeof tg.isVersionAtLeast === 'function' &&
-    tg.isVersionAtLeast('6.9')
-  );
+  // Глобальный перехватчик ошибок для наглядной диагностики в Telegram WebView
+  window.addEventListener('error', function(ev) {
+    var b = document.getElementById('saveBadge');
+    if (b) {
+      b.className = 'save-indicator';
+      b.textContent = '❌ Ошибка JS: ' + (ev.message || 'Unknown error');
+    }
+  });
 
-  if (tg && tg.initData && tg.initData.length > 0) {
+  // ========================================================================
+  // 1. ИНИЦИАЛИЗАЦИЯ TELEGRAM MINI APP И ГИБРИДНОГО ХРАНИЛИЩА
+  // ========================================================================
+  var tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+  var isTelegramApp = Boolean(tg && tg.initData && tg.initData.length > 0);
+  var isTelegramCloud = false;
+
+  try {
+    isTelegramCloud = Boolean(
+      isTelegramApp &&
+      tg.CloudStorage &&
+      typeof tg.isVersionAtLeast === 'function' &&
+      tg.isVersionAtLeast('6.9')
+    );
+  } catch (e) {
+    isTelegramCloud = false;
+  }
+
+  if (isTelegramApp) {
     try {
       tg.ready();
       tg.expand();
@@ -825,20 +843,19 @@
     } catch (e) {}
   }
 
-  // Тактильный отклик (Haptic Feedback) для нативного ощущения в Telegram на смартфоне
-  function tgHaptic(type) {
-    if (!tg || !tg.HapticFeedback) return;
+  function triggerHaptic(type) {
+    if (!isTelegramApp || !tg.HapticFeedback) return;
     try {
       if (type === 'selection') tg.HapticFeedback.selectionChanged();
       else tg.HapticFeedback.impactOccurred(type || 'light');
     } catch (e) {}
   }
 
-  // Безопасная обертка хранилища (localStorage + RAM Fallback при блокировке file://)
-  let memoryFallback = {};
-  let storageAvailable = false;
+  // Безопасная обертка localStorage + RAM Fallback
+  var memoryFallback = {};
+  var storageAvailable = false;
   try {
-    const testKey = '__bar2_test__';
+    var testKey = '__bar2_test__';
     window.localStorage.setItem(testKey, '1');
     window.localStorage.removeItem(testKey);
     storageAvailable = true;
@@ -860,194 +877,184 @@
     memoryFallback[key] = val;
   }
 
-  // Константы ключей для Telegram CloudStorage (1 день = 1 ключ, лимит 1024 ключа ≈ 2.8 года)
-  const TG_DAY_PREFIX = 'd_';
-  const TG_TAGS_KEY = 'meta_tags';
-  const TG_CLEARED_KEY = 'meta_cleared';
-  const cloudDebounceTimers = {};
+  // ========================================================================
+  // 2. ОБЕРТКИ ДЛЯ TELEGRAM CLOUD STORAGE (1 ДЕНЬ = 1 КЛЮЧ d_YYYY-MM-DD)
+  // ========================================================================
+  var CLOUD_DAY_PREFIX = 'd_';
+  var CLOUD_TAGS_KEY = 'meta_custom_tags';
+  var CLOUD_CLEARED_KEY = 'meta_user_cleared';
+  var cloudSyncTimer = null;
+  var pendingCloudDays = {};
 
-  function setStatusBadge(text) {
-    const badge = document.getElementById('saveBadge');
-    if (!badge) return;
-    badge.className = 'save-indicator ok';
-    badge.textContent = text;
+  function cloudGetKeys() {
+    return new Promise(function(resolve) {
+      if (!isTelegramCloud) return resolve([]);
+      try {
+        tg.CloudStorage.getKeys(function(err, keys) {
+          resolve(err || !Array.isArray(keys) ? [] : keys);
+        });
+      } catch (e) { resolve([]); }
+    });
   }
 
-  // Отложенная отправка одного ключа в Telegram CloudStorage (чтобы не спамить API при движении слайдера)
-  function syncKeyToTelegramCloud(key, valueStr) {
-    if (!isTelegramCloud) return;
-    if (cloudDebounceTimers[key]) clearTimeout(cloudDebounceTimers[key]);
-    setStatusBadge('✈️ Telegram Cloud · Синхронизация...');
-    cloudDebounceTimers[key] = setTimeout(function() {
+  function cloudGetItems(keys) {
+    return new Promise(function(resolve) {
+      if (!isTelegramCloud || !keys.length) return resolve({});
       try {
-        tg.CloudStorage.setItem(key, valueStr, function(err) {
-          if (err) {
-            setStatusBadge('⚠️ Облако недоступно (сохранено локально)');
-          } else {
-            const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            setStatusBadge('✈️ Telegram Cloud · Синхронизировано ' + t);
-          }
+        tg.CloudStorage.getItems(keys, function(err, values) {
+          resolve(err || !values ? {} : values);
         });
-      } catch (e) {}
+      } catch (e) { resolve({}); }
+    });
+  }
+
+  function cloudSetItem(key, val) {
+    return new Promise(function(resolve) {
+      if (!isTelegramCloud) return resolve(false);
+      try {
+        tg.CloudStorage.setItem(key, String(val), function(err, ok) {
+          resolve(!err && Boolean(ok));
+        });
+      } catch (e) { resolve(false); }
+    });
+  }
+
+  function cloudRemoveItems(keys) {
+    return new Promise(function(resolve) {
+      if (!isTelegramCloud || !keys.length) return resolve(true);
+      try {
+        tg.CloudStorage.removeItems(keys, function(err) {
+          resolve(!err);
+        });
+      } catch (e) { resolve(false); }
+    });
+  }
+
+  // Отложенная отправка измененных дней в облако Telegram (debounce 450 мс)
+  function queueCloudSync(dateKey) {
+    if (!isTelegramCloud) return;
+    if (dateKey) pendingCloudDays[dateKey] = true;
+
+    setStatusBadge('✈️ Telegram Cloud · Синхронизация...', 'cloud');
+    if (cloudSyncTimer) clearTimeout(cloudSyncTimer);
+
+    cloudSyncTimer = setTimeout(function() {
+      var daysToPush = Object.keys(pendingCloudDays);
+      pendingCloudDays = {};
+      var tasks = [];
+
+      daysToPush.forEach(function(d) {
+        if (db[d]) {
+          tasks.push(cloudSetItem(CLOUD_DAY_PREFIX + d, JSON.stringify(db[d])));
+        }
+      });
+      tasks.push(cloudSetItem(CLOUD_TAGS_KEY, JSON.stringify(customTags)));
+
+      Promise.all(tasks).then(function() {
+        var t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setStatusBadge('✈️ Telegram Cloud · Синхронизировано ' + t, 'cloud');
+      });
     }, 450);
   }
 
-  // Пакетная выгрузка всей базы в Telegram CloudStorage (при импорте JSON или загрузке демо)
-  function syncAllToTelegramCloud(callback) {
-    if (!isTelegramCloud) {
-      if (callback) callback();
-      return;
-    }
-    setStatusBadge('✈️ Telegram Cloud · Выгрузка базы...');
-    const entriesToPush = Object.keys(db).map(function(dateStr) {
-      return { key: TG_DAY_PREFIX + dateStr, val: JSON.stringify(db[dateStr]) };
+  // Полная выгрузка текущей базы в облако (при импорте JSON или загрузке демо)
+  function pushAllToTelegramCloud(doneMsg) {
+    if (!isTelegramCloud) return;
+    setStatusBadge('✈️ Выгрузка базы в Telegram Cloud...', 'cloud');
+    var tasks = Object.keys(db).map(function(d) {
+      return cloudSetItem(CLOUD_DAY_PREFIX + d, JSON.stringify(db[d]));
     });
-    entriesToPush.push({ key: TG_TAGS_KEY, val: JSON.stringify(customTags) });
-    entriesToPush.push({ key: TG_CLEARED_KEY, val: safeGetItem(CLEARED_FLAG_KEY) || 'false' });
+    tasks.push(cloudSetItem(CLOUD_TAGS_KEY, JSON.stringify(customTags)));
+    tasks.push(cloudSetItem(CLOUD_CLEARED_KEY, safeGetItem(CLEARED_FLAG_KEY) || 'false'));
 
-    let idx = 0;
-    function pushNext() {
-      if (idx >= entriesToPush.length) {
-        const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        setStatusBadge('✈️ Telegram Cloud · База синхронизирована ' + t);
-        if (callback) callback();
-        return;
-      }
-      const item = entriesToPush[idx++];
-      try {
-        tg.CloudStorage.setItem(item.key, item.val, function() {
-          pushNext();
-        });
-      } catch (e) {
-        pushNext();
-      }
-    }
-    pushNext();
+    Promise.all(tasks).then(function() {
+      setStatusBadge(doneMsg || '✈️ Telegram Cloud · База синхронизирована', 'cloud');
+    });
   }
 
-  // Очистка всех ключей дней в Telegram CloudStorage
-  function clearTelegramCloud(callback) {
-    if (!isTelegramCloud) {
-      if (callback) callback();
-      return;
-    }
-    setStatusBadge('✈️ Telegram Cloud · Очистка облака...');
-    try {
-      tg.CloudStorage.getKeys(function(err, keys) {
-        if (err || !Array.isArray(keys)) {
-          if (callback) callback();
-          return;
-        }
-        const dayKeys = keys.filter(function(k) { return k.indexOf(TG_DAY_PREFIX) === 0; });
-        const finishClear = function() {
-          tg.CloudStorage.setItem(TG_CLEARED_KEY, 'true', function() {
-            tg.CloudStorage.setItem(TG_DAY_PREFIX + currentDate, JSON.stringify(db[currentDate]), function() {
-              if (callback) callback();
-            });
-          });
-        };
-        if (dayKeys.length > 0) {
-          tg.CloudStorage.removeItems(dayKeys, function() { finishClear(); });
-        } else {
-          finishClear();
-        }
-      });
-    } catch (e) {
-      if (callback) callback();
-    }
-  }
-
-  // Загрузка и слияние данных из Telegram CloudStorage при старте приложения
+  // Загрузка всех записей из Telegram CloudStorage при старте приложения
   function hydrateFromTelegramCloud() {
     if (!isTelegramCloud) return;
-    setStatusBadge('✈️ Telegram Cloud · Загрузка записей...');
-    try {
-      tg.CloudStorage.getKeys(function(err, keys) {
-        if (err || !Array.isArray(keys) || keys.length === 0) {
-          setStatusBadge('✈️ Telegram Cloud · Готово (облако пока пустое)');
-          return;
-        }
+    setStatusBadge('✈️ Telegram Cloud · Загрузка записей...', 'cloud');
 
-        // Читаем ключи пачками по 50 штук (безопасно для лимитов Telegram)
-        const chunks = [];
-        for (let i = 0; i < keys.length; i += 50) {
-          chunks.push(keys.slice(i, i + 50));
-        }
-
-        const cloudValues = {};
-        let cIdx = 0;
-
-        function fetchNextChunk() {
-          if (cIdx >= chunks.length) {
-            applyCloudData(cloudValues);
-            return;
-          }
-          tg.CloudStorage.getItems(chunks[cIdx++], function(getErr, values) {
-            if (!getErr && values) {
-              Object.keys(values).forEach(function(k) {
-                cloudValues[k] = values[k];
-              });
-            }
-            fetchNextChunk();
-          });
-        }
-
-        fetchNextChunk();
-      });
-    } catch (e) {
-      setStatusBadge('⚠️ Ошибка чтения Telegram Cloud');
-    }
-  }
-
-  function applyCloudData(cloudValues) {
-    const cloudCleared = cloudValues[TG_CLEARED_KEY] === 'true';
-    const dayKeys = Object.keys(cloudValues).filter(function(k) {
-      return k.indexOf(TG_DAY_PREFIX) === 0 && cloudValues[k];
-    });
-
-    if (cloudValues[TG_TAGS_KEY]) {
-      try {
-        const parsedTags = JSON.parse(cloudValues[TG_TAGS_KEY]);
-        if (Array.isArray(parsedTags)) customTags = parsedTags;
-      } catch (e) {}
-    }
-
-    if (dayKeys.length > 0 || cloudCleared) {
-      // Если в облаке есть реальные записи или флаг очистки — заменяем локальный кэш данными из облака
-      const nextDb = {};
-      dayKeys.forEach(function(k) {
-        try {
-          const parsedDay = JSON.parse(cloudValues[k]);
-          if (parsedDay && parsedDay.date) {
-            nextDb[parsedDay.date] = parsedDay;
-          }
-        } catch (e) {}
-      });
-      if (Object.keys(nextDb).length === 0) {
-        nextDb[currentDate] = defaultEntry(currentDate);
+    cloudGetKeys().then(function(keys) {
+      if (!keys.length) {
+        // Облако еще пустое — выгружаем текущее состояние в облако
+        pushAllToTelegramCloud('✈️ Telegram Cloud · Готово к синхронизации');
+        return;
       }
-      db = nextDb;
-      safeSetItem(CLEARED_FLAG_KEY, cloudCleared ? 'true' : 'false');
-      safeSetItem(STORAGE_KEY, JSON.stringify(db));
-      safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
 
-      renderCheckin();
-      renderAnalytics();
-      renderReportTable();
-    }
+      // Читаем ключи батчами по 50 штук
+      var chunks = [];
+      for (var i = 0; i < keys.length; i += 50) {
+        chunks.push(keys.slice(i, i + 50));
+      }
 
-    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    setStatusBadge('✈️ Telegram Cloud · Синхронизировано (' + Object.keys(db).length + ' дн.) ' + t);
+      Promise.all(chunks.map(cloudGetItems)).then(function(results) {
+        var merged = {};
+        results.forEach(function(obj) {
+          Object.keys(obj).forEach(function(k) { merged[k] = obj[k]; });
+        });
+
+        var cloudDb = {};
+        var foundDays = 0;
+
+        Object.keys(merged).forEach(function(k) {
+          if (k.indexOf(CLOUD_DAY_PREFIX) === 0 && merged[k]) {
+            try {
+              var parsedDay = JSON.parse(merged[k]);
+              if (parsedDay && parsedDay.date) {
+                cloudDb[parsedDay.date] = parsedDay;
+                foundDays++;
+              }
+            } catch (e) {}
+          }
+        });
+
+        if (merged[CLOUD_TAGS_KEY]) {
+          try {
+            var parsedTags = JSON.parse(merged[CLOUD_TAGS_KEY]);
+            if (Array.isArray(parsedTags)) customTags = parsedTags;
+          } catch (e) {}
+        }
+
+        var cloudCleared = merged[CLOUD_CLEARED_KEY] === 'true';
+
+        if (foundDays > 0) {
+          db = cloudDb;
+          safeSetItem(STORAGE_KEY, JSON.stringify(db));
+          safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
+          safeSetItem(CLEARED_FLAG_KEY, cloudCleared ? 'true' : 'false');
+          renderCheckin();
+          renderAnalytics();
+          renderReportTable();
+          setStatusBadge('✈️ Telegram Cloud · Загружено (' + foundDays + ' дн.)', 'cloud');
+        } else if (cloudCleared) {
+          db = {};
+          db[currentDate] = defaultEntry(currentDate);
+          safeSetItem(STORAGE_KEY, JSON.stringify(db));
+          safeSetItem(CLEARED_FLAG_KEY, 'true');
+          renderCheckin();
+          renderAnalytics();
+          renderReportTable();
+          setStatusBadge('✈️ Telegram Cloud · Чистая база', 'cloud');
+        } else {
+          pushAllToTelegramCloud('✈️ Telegram Cloud · Синхронизировано');
+        }
+      });
+    });
   }
 
-  // Справочники клинических тегов
-  const SLEEP_TAGS = [
+  // ========================================================================
+  // 3. КЛИНИЧЕСКИЕ СПРАВОЧНИКИ И КОНСТАНТЫ
+  // ========================================================================
+  var SLEEP_TAGS = [
     { id: 'insomnia', label: 'Трудно уснуть / Бессонница' },
     { id: 'broken', label: 'Прерывистый / Раннее пробуждение' },
     { id: 'hypersomnia', label: 'Гиперсомния (10–14ч и нет сил)' },
     { id: 'no_need_sleep', label: '🚩 Мало спал, но полон сил!', danger: true }
   ];
-  const HYPO_TAGS = [
+  var HYPO_TAGS = [
     { id: 'fast_speech', label: 'Ускоренная речь' },
     { id: 'racing_thoughts', label: 'Скачка идей в голове' },
     { id: 'impulsive_spend', label: 'Импульсивные траты' },
@@ -1055,19 +1062,19 @@
     { id: 'many_projects', label: 'Взялся за кучу проектов' },
     { id: 'oversocial', label: 'Повышенная общительность' }
   ];
-  const DEPR_TAGS = [
+  var DEPR_TAGS = [
     { id: 'anhedonia', label: 'Ангедония (ничего не радует)' },
     { id: 'guilt', label: 'Чувство вины' },
     { id: 'brain_fog', label: 'Туман в голове' },
     { id: 'lead_body', label: 'Свинцовая тяжесть в теле' },
     { id: 'isolation', label: 'Изоляция' }
   ];
-  const SAFETY_TAGS = [
+  var SAFETY_TAGS = [
     { id: 'diurnal_swing', label: '🎢 Резкие качели внутри дня (утро ≠ вечер)' },
     { id: 'passive_si', label: 'Пассивные мысли («хочется исчезнуть»)', danger: true },
     { id: 'active_si', label: '🆘 Активные суицидальные импульсы', danger: true }
   ];
-  const TRIGGER_TAGS = [
+  var TRIGGER_TAGS = [
     { id: 'sos_med', label: '💊 Принял СОС-препарат' },
     { id: 'stress', label: '⚡ Острый стресс / Конфликт' },
     { id: 'caffeine', label: '☕ Много кофеина' },
@@ -1076,40 +1083,40 @@
     { id: 'cycle', label: '🩸 ПМС / Начало цикла' }
   ];
 
-  const MOOD_DESC = {
-    "-3": "-3 · Тяжелая депрессия", "-2.5": "-2.5 · Выраженная депрессия",
-    "-2": "-2 · Умеренная депрессия", "-1.5": "-1.5 · Субдепрессия",
-    "-1": "-1 · Сниженный фон", "-0.5": "-0.5 · Легкая меланхолия",
-    "0": "0 · Эутимия (Ровно)", "0.5": "+0.5 · Приятный тонус",
-    "1": "+1 · Легкий подъем", "1.5": "+1.5 · Умеренная гипомания",
-    "2": "+2 · Выраженная гипомания", "2.5": "+2.5 · Сильный разгон",
-    "3": "+3 · Тяжелая гипомания"
+  var MOOD_DESC = {
+    '-3': '-3 · Тяжелая депрессия', '-2.5': '-2.5 · Выраженная депрессия',
+    '-2': '-2 · Умеренная депрессия', '-1.5': '-1.5 · Субдепрессия',
+    '-1': '-1 · Сниженный фон', '-0.5': '-0.5 · Легкая меланхолия',
+    '0': '0 · Эутимия (Ровно)', '0.5': '+0.5 · Приятный тонус',
+    '1': '+1 · Легкий подъем', '1.5': '+1.5 · Умеренная гипомания',
+    '2': '+2 · Выраженная гипомания', '2.5': '+2.5 · Сильный разгон',
+    '3': '+3 · Тяжелая гипомания'
   };
 
-  const ENERGY_DESC = {
-    "-3": "-3 · Полный ступор", "-2.5": "-2.5 · Крайнее истощение",
-    "-2": "-2 · Выраженная апатия", "-1.5": "-1.5 · Вялость",
-    "-1": "-1 · Сниженная энергия", "-0.5": "-0.5 · Слегка сонный",
-    "0": "0 · Нормальный тонус", "0.5": "+0.5 · Бодрый",
-    "1": "+1 · Высокая активность", "1.5": "+1.5 · Ускорение",
-    "2": "+2 · Гиперактивность", "2.5": "+2.5 · Моторный разгон",
-    "3": "+3 · Экстремальная ажитация"
+  var ENERGY_DESC = {
+    '-3': '-3 · Полный ступор', '-2.5': '-2.5 · Крайнее истощение',
+    '-2': '-2 · Выраженная апатия', '-1.5': '-1.5 · Вялость',
+    '-1': '-1 · Сниженная энергия', '-0.5': '-0.5 · Слегка сонный',
+    '0': '0 · Нормальный тонус', '0.5': '+0.5 · Бодрый',
+    '1': '+1 · Высокая активность', '1.5': '+1.5 · Ускорение',
+    '2': '+2 · Гиперактивность', '2.5': '+2.5 · Моторный разгон',
+    '3': '+3 · Экстремальная ажитация'
   };
 
-  const STORAGE_KEY = 'bar2_lifechart_db_v2';
-  const CUSTOM_TAGS_KEY = 'bar2_custom_tags_v2';
-  const CLEARED_FLAG_KEY = 'bar2_user_cleared_v2';
+  var STORAGE_KEY = 'bar2_lifechart_db_v2';
+  var CUSTOM_TAGS_KEY = 'bar2_custom_tags_v2';
+  var CLEARED_FLAG_KEY = 'bar2_user_cleared_v2';
 
-  let db = {};
-  let customTags = [];
-  let currentDate = formatDateISO(new Date());
-  let zeroMode = false;
-  let chartDaysRange = 30;
-  let clearConfirmTimeout = null;
+  var db = {};
+  var customTags = [];
+  var currentDate = formatDateISO(new Date());
+  var zeroMode = false;
+  var chartDaysRange = 30;
+  var clearConfirmTimeout = null;
 
   function formatDateISO(d) {
-    const off = d.getTimezoneOffset();
-    const local = new Date(d.getTime() - off * 60 * 1000);
+    var off = d.getTimezoneOffset();
+    var local = new Date(d.getTime() - off * 60 * 1000);
     return local.toISOString().split('T')[0];
   }
 
@@ -1122,10 +1129,19 @@
     };
   }
 
-  // Загрузка сохраненной базы или 21-дневного клинического демо-сценария
+  function setStatusBadge(text, mode) {
+    var badge = document.getElementById('saveBadge');
+    if (!badge) return;
+    badge.className = 'save-indicator' + (mode === 'cloud' ? ' cloud' : (mode === 'ok' ? ' ok' : ''));
+    badge.textContent = text;
+  }
+
+  // ========================================================================
+  // 4. УПРАВЛЕНИЕ БАЗОЙ ДАННЫХ (ДЕМО, ОЧИСТКА, СОХРАНЕНИЕ)
+  // ========================================================================
   function loadDemoData(force) {
-    const raw = safeGetItem(STORAGE_KEY);
-    const wasCleared = safeGetItem(CLEARED_FLAG_KEY) === 'true';
+    var raw = safeGetItem(STORAGE_KEY);
+    var wasCleared = safeGetItem(CLEARED_FLAG_KEY) === 'true';
 
     if (!force && (raw || wasCleared)) {
       try {
@@ -1140,7 +1156,7 @@
 
     safeSetItem(CLEARED_FLAG_KEY, 'false');
     db = {};
-    const scenario = [
+    var scenario = [
       { d: -20, m: -2.0, e: -2.5, ir: 0, ax: 1, sh: 11.0, bt: '00:30', wt: '11:30', st: ['hypersomnia'], pt: ['anhedonia','lead_body'], sf: [], md: 'full', tr: [], nt: 'Тяжело встать, гиперсомния' },
       { d: -19, m: -2.5, e: -2.5, ir: 0, ax: 1, sh: 11.5, bt: '01:00', wt: '12:30', st: ['hypersomnia'], pt: ['anhedonia','brain_fog'], sf: ['passive_si'], md: 'partial', tr: [], nt: 'Пропустил утро' },
       { d: -18, m: -2.0, e: -2.0, ir: 1, ax: 1, sh: 10.0, bt: '00:30', wt: '10:30', st: ['hypersomnia'], pt: ['anhedonia'], sf: [], md: 'full', tr: [], nt: '' },
@@ -1164,11 +1180,11 @@
       { d: 0, m: 0.0, e: 0.5, ir: 0, ax: 0, sh: 7.5, bt: '23:30', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: 'Сегодняшний день (демо)' }
     ];
 
-    const today = new Date();
-    scenario.forEach(item => {
-      const dt = new Date(today);
+    var today = new Date();
+    scenario.forEach(function(item) {
+      var dt = new Date(today);
       dt.setDate(today.getDate() + item.d);
-      const iso = formatDateISO(dt);
+      var iso = formatDateISO(dt);
       db[iso] = {
         date: iso, mood: item.m, energy: item.e, irritability: item.ir, anxiety: item.ax,
         sleepHours: item.sh, bedTime: item.bt, wakeTime: item.wt,
@@ -1176,60 +1192,55 @@
         meds: item.md, triggers: item.tr, notes: item.nt
       };
     });
-    saveDB();
+    safeSetItem(STORAGE_KEY, JSON.stringify(db));
   }
 
-  // Полная очистка базы с нуля
   function clearDatabaseFromScratch() {
     db = {};
     currentDate = formatDateISO(new Date());
     db[currentDate] = defaultEntry(currentDate);
     safeSetItem(CLEARED_FLAG_KEY, 'true');
-    saveDB('✨ База полностью очищена! Начат чистый дневник с ' + currentDate);
-    clearTelegramCloud(function() {
-      if (isTelegramCloud) {
-        setStatusBadge('✈️ Telegram Cloud · Облако очищено');
-      }
-    });
+    safeSetItem(STORAGE_KEY, JSON.stringify(db));
+
     renderCheckin();
     renderAnalytics();
     renderReportTable();
-  }
-
-  function saveDB(customMessage, changedDate, syncTags) {
-    safeSetItem(STORAGE_KEY, JSON.stringify(db));
-    safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
 
     if (isTelegramCloud) {
-      if (changedDate && db[changedDate]) {
-        syncKeyToTelegramCloud(TG_DAY_PREFIX + changedDate, JSON.stringify(db[changedDate]));
-      }
-      if (syncTags) {
-        syncKeyToTelegramCloud(TG_TAGS_KEY, JSON.stringify(customTags));
-      }
-    }
-
-    if (customMessage) {
-      setStatusBadge(customMessage);
-      return;
-    }
-    if (!isTelegramCloud) {
-      const modeText = storageAvailable ? 'Локальная память' : 'ОЗУ-режим';
-      setStatusBadge('🟢 JS Активен · Сохранено (' + modeText + ') ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setStatusBadge('✈️ Очистка Telegram Cloud...', 'cloud');
+      cloudGetKeys().then(function(keys) {
+        var dayKeys = keys.filter(function(k) { return k.indexOf(CLOUD_DAY_PREFIX) === 0; });
+        return cloudRemoveItems(dayKeys);
+      }).then(function() {
+        return Promise.all([
+          cloudSetItem(CLOUD_CLEARED_KEY, 'true'),
+          cloudSetItem(CLOUD_DAY_PREFIX + currentDate, JSON.stringify(db[currentDate]))
+        ]);
+      }).then(function() {
+        setStatusBadge('✨ Облако и база очищены! Старт с ' + currentDate, 'cloud');
+      });
+    } else {
+      setStatusBadge('✨ База полностью очищена! Старт с ' + currentDate, 'ok');
     }
   }
 
-  function saveDB(customMessage) {
+  function saveDB(customMessage, changedDateKey) {
     safeSetItem(STORAGE_KEY, JSON.stringify(db));
     safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
-    const badge = document.getElementById('saveBadge');
-    badge.className = 'save-indicator ok';
-    if (customMessage) {
-      badge.textContent = customMessage;
+
+    if (changedDateKey && isTelegramCloud) {
+      queueCloudSync(changedDateKey);
       return;
     }
-    const modeText = storageAvailable ? 'Локальная память' : 'ОЗУ-режим';
-    badge.textContent = '🟢 JS Активен · Сохранено (' + modeText + ') ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    if (customMessage) {
+      setStatusBadge(customMessage, isTelegramCloud ? 'cloud' : 'ok');
+      return;
+    }
+
+    var modeText = storageAvailable ? 'Локальная память' : 'ОЗУ-режим';
+    var timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setStatusBadge('🟢 Сохранено (' + modeText + ') ' + timeStr, 'ok');
   }
 
   function getEntry(dateStr) {
@@ -1237,19 +1248,27 @@
     return db[dateStr];
   }
 
-  // Алгоритмы клинической детекции фаз
+  // ========================================================================
+  // 5. КЛИНИЧЕСКИЕ АЛГОРИТМЫ ДЕТЕКЦИИ ФАЗ
+  // ========================================================================
   function isMixedState(e) {
-    const delta = e.energy - e.mood;
-    return (e.mood <= -1 && e.energy >= 1) || (e.mood <= -1 && (e.irritability >= 2 || e.anxiety >= 2)) || (delta >= 2.5 && e.mood < 0);
+    var delta = e.energy - e.mood;
+    return (e.mood <= -1 && e.energy >= 1) ||
+           (e.mood <= -1 && (e.irritability >= 2 || e.anxiety >= 2)) ||
+           (delta >= 2.5 && e.mood < 0);
   }
 
   function isHypoProdrome(e) {
-    return (e.sleepHours < 5.5 && e.energy >= 1) || e.sleepTags.indexOf('no_need_sleep') !== -1 || (e.mood >= 1.5 && e.energy >= 1.5);
+    return (e.sleepHours < 5.5 && e.energy >= 1) ||
+           (e.sleepTags && e.sleepTags.indexOf('no_need_sleep') !== -1) ||
+           (e.mood >= 1.5 && e.energy >= 1.5);
   }
 
-  // Отрисовка экрана чек-ина
+  // ========================================================================
+  // 6. РЕНДЕРИНГ ИНТЕРФЕЙСА (ЧЕК-ИН, ГРАФИК NIMH, ОТЧЕТ)
+  // ========================================================================
   function renderCheckin() {
-    const entry = getEntry(currentDate);
+    var entry = getEntry(currentDate);
     document.getElementById('currentDateInput').value = currentDate;
     document.getElementById('moodSlider').value = entry.mood;
     document.getElementById('energySlider').value = entry.energy;
@@ -1259,18 +1278,18 @@
     renderSeg('irritabilitySeg', entry.irritability);
     renderSeg('anxietySeg', entry.anxiety);
 
-    const shEl = document.getElementById('sleepHoursDisplay');
-    shEl.textContent = entry.sleepHours.toFixed(1) + ' ч';
+    var shEl = document.getElementById('sleepHoursDisplay');
+    shEl.textContent = Number(entry.sleepHours).toFixed(1) + ' ч';
     shEl.style.color = entry.sleepHours < 5.5 ? '#d97706' : (entry.sleepHours >= 10 ? '#2563eb' : 'var(--ink)');
 
     document.getElementById('bedTimeInput').value = entry.bedTime || '23:30';
     document.getElementById('wakeTimeInput').value = entry.wakeTime || '07:00';
 
-    renderChips('sleepTagsWrap', SLEEP_TAGS, entry.sleepTags, 'sleepTags', '');
-    renderChips('hypoTagsWrap', HYPO_TAGS.concat(customTags), entry.phaseTags, 'phaseTags', 'hypo');
-    renderChips('deprTagsWrap', DEPR_TAGS, entry.phaseTags, 'phaseTags', 'depr');
-    renderChips('safetyTagsWrap', SAFETY_TAGS, entry.safetyTags, 'safetyTags', 'danger');
-    renderChips('triggerTagsWrap', TRIGGER_TAGS, entry.triggers, 'triggers', '');
+    renderChips('sleepTagsWrap', SLEEP_TAGS, entry.sleepTags || [], 'sleepTags', '');
+    renderChips('hypoTagsWrap', HYPO_TAGS.concat(customTags), entry.phaseTags || [], 'phaseTags', 'hypo');
+    renderChips('deprTagsWrap', DEPR_TAGS, entry.phaseTags || [], 'phaseTags', 'depr');
+    renderChips('safetyTagsWrap', SAFETY_TAGS, entry.safetyTags || [], 'safetyTags', 'danger');
+    renderChips('triggerTagsWrap', TRIGGER_TAGS, entry.triggers || [], 'triggers', '');
 
     document.getElementById('medFull').className = 'med-btn' + (entry.meds === 'full' ? ' active-full' : '');
     document.getElementById('medPart').className = 'med-btn' + (entry.meds === 'partial' ? ' active-part' : '');
@@ -1279,34 +1298,35 @@
 
     document.getElementById('mixedAlert').classList.toggle('show', isMixedState(entry));
     document.getElementById('hypoAlert').classList.toggle('show', isHypoProdrome(entry));
-    const hasSafety = entry.safetyTags.indexOf('passive_si') !== -1 || entry.safetyTags.indexOf('active_si') !== -1;
+    var hasSafety = (entry.safetyTags || []).indexOf('passive_si') !== -1 || (entry.safetyTags || []).indexOf('active_si') !== -1;
     document.getElementById('safetyAlert').classList.toggle('show', hasSafety);
   }
 
   function renderSeg(containerId, activeVal) {
-    const btns = document.getElementById(containerId).querySelectorAll('.seg-btn');
-    btns.forEach((btn, idx) => {
+    var btns = document.getElementById(containerId).querySelectorAll('.seg-btn');
+    btns.forEach(function(btn, idx) {
       btn.className = 'seg-btn' + (idx === activeVal ? ' active-' + idx : '');
     });
   }
 
   function renderChips(containerId, list, selectedArr, fieldName, extraClass) {
-    const wrap = document.getElementById(containerId);
+    var wrap = document.getElementById(containerId);
     wrap.innerHTML = '';
-    list.forEach(item => {
-      const isSelected = selectedArr.indexOf(item.id) !== -1;
-      const btn = document.createElement('button');
+    list.forEach(function(item) {
+      var isSelected = selectedArr.indexOf(item.id) !== -1;
+      var btn = document.createElement('button');
       btn.type = 'button';
-      const cls = item.danger ? 'danger' : extraClass;
+      var cls = item.danger ? 'danger' : extraClass;
       btn.className = 'chip ' + cls + (isSelected ? ' active' : '');
       btn.textContent = item.label;
       btn.addEventListener('click', function() {
-        const entry = getEntry(currentDate);
-        const arr = entry[fieldName];
-        const idx = arr.indexOf(item.id);
+        triggerHaptic('selection');
+        var entry = getEntry(currentDate);
+        if (!Array.isArray(entry[fieldName])) entry[fieldName] = [];
+        var arr = entry[fieldName];
+        var idx = arr.indexOf(item.id);
         if (idx === -1) arr.push(item.id);
         else arr.splice(idx, 1);
-        tgHaptic('selection');
         saveDB(null, currentDate);
         renderCheckin();
       });
@@ -1314,16 +1334,15 @@
     });
   }
 
-  // Отрисовка KPI и векторного графика NIMH (Inline SVG)
   function renderAnalytics() {
-    const dates = Object.keys(db).sort().slice(-chartDaysRange);
-    const entries = dates.map(d => db[d]);
+    var dates = Object.keys(db).sort().slice(-chartDaysRange);
+    var entries = dates.map(function(d) { return db[d]; });
 
-    const avgSleep = entries.length ? (entries.reduce((s, e) => s + e.sleepHours, 0) / entries.length).toFixed(1) : 0;
-    const fullMeds = entries.filter(e => e.meds === 'full').length;
-    const adherence = entries.length ? Math.round((fullMeds / entries.length) * 100) : 100;
-    const mixedDays = entries.filter(isMixedState).length;
-    const hypoDays = entries.filter(isHypoProdrome).length;
+    var avgSleep = entries.length ? (entries.reduce(function(s, e) { return s + Number(e.sleepHours || 0); }, 0) / entries.length).toFixed(1) : 0;
+    var fullMeds = entries.filter(function(e) { return e.meds === 'full'; }).length;
+    var adherence = entries.length ? Math.round((fullMeds / entries.length) * 100) : 100;
+    var mixedDays = entries.filter(isMixedState).length;
+    var hypoDays = entries.filter(isHypoProdrome).length;
 
     document.getElementById('kpiContainer').innerHTML =
       '<div class="kpi-card"><div class="kpi-label">Средний сон (' + entries.length + ' дн.)</div><div class="kpi-val">' + avgSleep + ' ч</div></div>' +
@@ -1331,41 +1350,42 @@
       '<div class="kpi-card"><div class="kpi-label">Дней со смеш. фазой</div><div class="kpi-val">' + mixedDays + '</div></div>' +
       '<div class="kpi-card"><div class="kpi-label">Маркеров гипомании</div><div class="kpi-val">' + hypoDays + '</div></div>';
 
-    const width = Math.max(660, entries.length * 38);
-    const height = 340, padL = 42, padR = 24, padT = 20, chartH = 190, sleepTop = 235, sleepH = 70;
-    const getX = (i) => entries.length <= 1 ? (width / 2) : (padL + (i / (entries.length - 1)) * (width - padL - padR));
-    const getY = (val) => padT + ((3 - val) / 6) * chartH;
+    var width = Math.max(660, entries.length * 38);
+    var height = 340, padL = 42, padR = 24, padT = 20, chartH = 190, sleepTop = 235, sleepH = 70;
+    var getX = function(i) { return entries.length <= 1 ? (width / 2) : (padL + (i / (entries.length - 1)) * (width - padL - padR)); };
+    var getY = function(val) { return padT + ((3 - val) / 6) * chartH; };
 
-    let svg = '<svg width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" xmlns="http://www.w3.org/2000/svg">';
-    for (let v = -3; v <= 3; v++) {
-      const y = getY(v);
+    var svg = '<svg width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" xmlns="http://www.w3.org/2000/svg">';
+    for (var v = -3; v <= 3; v++) {
+      var y = getY(v);
       svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (width - padR) + '" y2="' + y + '" stroke="' + (v === 0 ? '#64748b' : '#2a2a2e') + '" stroke-width="' + (v === 0 ? 1.5 : 1) + '" />';
       svg += '<text x="' + (padL - 8) + '" y="' + (y + 4) + '" fill="#94a3b8" font-size="11" text-anchor="end">' + (v > 0 ? '+' + v : v) + '</text>';
     }
 
-    const barW = Math.min(22, (width - padL - padR) / Math.max(1, entries.length) * 0.65);
-    entries.forEach((e, i) => {
-      const x = getX(i);
+    var barW = Math.min(22, (width - padL - padR) / Math.max(1, entries.length) * 0.65);
+    entries.forEach(function(e, i) {
+      var x = getX(i);
       if (isMixedState(e)) {
-        svg += '<rect x="' + (x - barW/2 - 3) + '" y="' + padT + '" width="' + (barW + 6) + '" height="' + chartH + '" fill="rgba(239,68,68,0.18)" rx="4" />';
+        svg += '<rect x="' + (x - barW / 2 - 3) + '" y="' + padT + '" width="' + (barW + 6) + '" height="' + chartH + '" fill="rgba(239,68,68,0.18)" rx="4" />';
       }
-      const bH = (Math.min(14, e.sleepHours) / 14) * sleepH;
-      const bY = sleepTop + (sleepH - bH);
-      const barColor = e.sleepHours < 5.5 ? '#f97316' : (e.sleepHours >= 10 ? '#818cf8' : '#38bdf8');
-      svg += '<rect x="' + (x - barW/2) + '" y="' + bY + '" width="' + barW + '" height="' + bH + '" fill="' + barColor + '" opacity="0.65" rx="3" />';
-      svg += '<text x="' + x + '" y="' + (bY - 4) + '" fill="#cbd5e1" font-size="9.5" text-anchor="middle">' + e.sleepHours + '</text>';
-      svg += '<text x="' + x + '" y="' + (height - 8) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + e.date.slice(8,10) + '.' + e.date.slice(5,7) + '</text>';
+      var sh = Number(e.sleepHours || 0);
+      var bH = (Math.min(14, sh) / 14) * sleepH;
+      var bY = sleepTop + (sleepH - bH);
+      var barColor = sh < 5.5 ? '#f97316' : (sh >= 10 ? '#818cf8' : '#38bdf8');
+      svg += '<rect x="' + (x - barW / 2) + '" y="' + bY + '" width="' + barW + '" height="' + bH + '" fill="' + barColor + '" opacity="0.65" rx="3" />';
+      svg += '<text x="' + x + '" y="' + (bY - 4) + '" fill="#cbd5e1" font-size="9.5" text-anchor="middle">' + sh + '</text>';
+      svg += '<text x="' + x + '" y="' + (height - 8) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + e.date.slice(8, 10) + '.' + e.date.slice(5, 7) + '</text>';
     });
 
     if (entries.length > 1) {
-      const mPts = entries.map((e, i) => getX(i) + ',' + getY(e.mood)).join(' ');
-      const ePts = entries.map((e, i) => getX(i) + ',' + getY(e.energy)).join(' ');
+      var mPts = entries.map(function(e, i) { return getX(i) + ',' + getY(e.mood); }).join(' ');
+      var ePts = entries.map(function(e, i) { return getX(i) + ',' + getY(e.energy); }).join(' ');
       svg += '<polyline fill="none" stroke="#60a5fa" stroke-width="3" points="' + mPts + '" />';
       svg += '<polyline fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="5,3" points="' + ePts + '" />';
     }
 
-    entries.forEach((e, i) => {
-      const x = getX(i);
+    entries.forEach(function(e, i) {
+      var x = getX(i);
       svg += '<circle cx="' + x + '" cy="' + getY(e.mood) + '" r="5" fill="' + (isMixedState(e) ? '#ef4444' : '#60a5fa') + '" />';
       svg += '<circle cx="' + x + '" cy="' + getY(e.energy) + '" r="4.5" fill="#f59e0b" />';
     });
@@ -1373,20 +1393,22 @@
     document.getElementById('svgChartBox').innerHTML = svg;
   }
 
-  // Отрисовка таблицы отчета для врача
   function renderReportTable() {
-    const tbody = document.querySelector('#reportTable tbody');
-    const dates = Object.keys(db).sort().reverse();
+    var tbody = document.querySelector('#reportTable tbody');
+    var dates = Object.keys(db).sort().reverse();
     document.getElementById('totalDaysCount').textContent = dates.length;
 
-    const allTagMap = {};
-    SLEEP_TAGS.concat(HYPO_TAGS, DEPR_TAGS, SAFETY_TAGS, TRIGGER_TAGS, customTags).forEach(t => { allTagMap[t.id] = t.label; });
-    const medsMap = { full: '✅ Полностью', partial: '⚠️ Частично', missed: '❌ Пропуск' };
+    var allTagMap = {};
+    SLEEP_TAGS.concat(HYPO_TAGS, DEPR_TAGS, SAFETY_TAGS, TRIGGER_TAGS, customTags).forEach(function(t) {
+      allTagMap[t.id] = t.label;
+    });
+    var medsMap = { full: '✅ Полностью', partial: '⚠️ Частично', missed: '❌ Пропуск' };
 
-    tbody.innerHTML = dates.map(d => {
-      const e = db[d];
-      const mixed = isMixedState(e);
-      const tags = e.sleepTags.concat(e.phaseTags, e.safetyTags, e.triggers).map(id => allTagMap[id] || id).join(', ');
+    tbody.innerHTML = dates.map(function(d) {
+      var e = db[d];
+      var mixed = isMixedState(e);
+      var allIds = (e.sleepTags || []).concat(e.phaseTags || [], e.safetyTags || [], e.triggers || []);
+      var tags = allIds.map(function(id) { return allTagMap[id] || id; }).join(', ');
       return '<tr style="' + (mixed ? 'background:rgba(224,79,51,0.08)' : '') + '">' +
         '<td><strong>' + e.date + '</strong> ' + (mixed ? '⚠️' : '') + '</td>' +
         '<td style="color:#2563eb;font-weight:700;">' + (e.mood > 0 ? '+' + e.mood : e.mood) + '</td>' +
@@ -1398,15 +1420,17 @@
     }).join('');
   }
 
-  // Привязка обработчиков событий
+  // ========================================================================
+  // 7. ПРИВЯЗКА ВСЕХ СОБЫТИЙ ИНТЕРФЕЙСА
+  // ========================================================================
   function bindEvents() {
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        tgHaptic('selection');
-        const tab = this.getAttribute('data-tab');
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        triggerHaptic('selection');
+        var tab = this.getAttribute('data-tab');
+        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
         this.classList.add('active');
-        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.view-section').forEach(function(s) { s.classList.remove('active'); });
         document.getElementById('view-' + tab).classList.add('active');
         if (tab === 'chart') renderAnalytics();
         if (tab === 'report') renderReportTable();
@@ -1414,16 +1438,16 @@
     });
 
     document.getElementById('prevDayBtn').addEventListener('click', function() {
-      tgHaptic('light');
-      const d = new Date(currentDate + 'T12:00:00');
+      triggerHaptic('light');
+      var d = new Date(currentDate + 'T12:00:00');
       d.setDate(d.getDate() - 1);
       currentDate = formatDateISO(d);
       renderCheckin();
     });
 
     document.getElementById('nextDayBtn').addEventListener('click', function() {
-      tgHaptic('light');
-      const d = new Date(currentDate + 'T12:00:00');
+      triggerHaptic('light');
+      var d = new Date(currentDate + 'T12:00:00');
       d.setDate(d.getDate() + 1);
       currentDate = formatDateISO(d);
       renderCheckin();
@@ -1434,10 +1458,10 @@
     });
 
     document.getElementById('zeroModeBtn').addEventListener('click', function() {
-      tgHaptic('light');
+      triggerHaptic('light');
       zeroMode = !zeroMode;
       this.classList.toggle('active', zeroMode);
-      document.querySelectorAll('.extra-block').forEach(el => {
+      document.querySelectorAll('.extra-block').forEach(function(el) {
         el.style.display = zeroMode ? 'none' : '';
       });
     });
@@ -1454,18 +1478,18 @@
       renderCheckin();
     });
 
-    document.querySelectorAll('#irritabilitySeg .seg-btn').forEach(btn => {
+    document.querySelectorAll('#irritabilitySeg .seg-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        tgHaptic('selection');
+        triggerHaptic('selection');
         getEntry(currentDate).irritability = parseInt(this.getAttribute('data-val'), 10);
         saveDB(null, currentDate);
         renderCheckin();
       });
     });
 
-    document.querySelectorAll('#anxietySeg .seg-btn').forEach(btn => {
+    document.querySelectorAll('#anxietySeg .seg-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        tgHaptic('selection');
+        triggerHaptic('selection');
         getEntry(currentDate).anxiety = parseInt(this.getAttribute('data-val'), 10);
         saveDB(null, currentDate);
         renderCheckin();
@@ -1473,33 +1497,34 @@
     });
 
     document.getElementById('sleepMinusBtn').addEventListener('click', function() {
-      tgHaptic('light');
-      const e = getEntry(currentDate);
-      e.sleepHours = Math.max(0, e.sleepHours - 0.5);
+      triggerHaptic('light');
+      var e = getEntry(currentDate);
+      e.sleepHours = Math.max(0, Number(e.sleepHours) - 0.5);
       saveDB(null, currentDate);
       renderCheckin();
     });
 
     document.getElementById('sleepPlusBtn').addEventListener('click', function() {
-      tgHaptic('light');
-      const e = getEntry(currentDate);
-      e.sleepHours = Math.min(18, e.sleepHours + 0.5);
+      triggerHaptic('light');
+      var e = getEntry(currentDate);
+      e.sleepHours = Math.min(18, Number(e.sleepHours) + 0.5);
       saveDB(null, currentDate);
       renderCheckin();
     });
 
     function recalcSleepTime() {
-      const e = getEntry(currentDate);
-      const bt = document.getElementById('bedTimeInput').value;
-      const wt = document.getElementById('wakeTimeInput').value;
-      e.bedTime = bt; e.wakeTime = wt;
+      var e = getEntry(currentDate);
+      var bt = document.getElementById('bedTimeInput').value;
+      var wt = document.getElementById('wakeTimeInput').value;
+      e.bedTime = bt;
+      e.wakeTime = wt;
       if (bt && wt) {
-        const bParts = bt.split(':').map(Number);
-        const wParts = wt.split(':').map(Number);
-        let bMin = bParts[0] * 60 + bParts[1];
-        let wMin = wParts[0] * 60 + wParts[1];
+        var bParts = bt.split(':').map(Number);
+        var wParts = wt.split(':').map(Number);
+        var bMin = bParts[0] * 60 + bParts[1];
+        var wMin = wParts[0] * 60 + wParts[1];
         if (wMin <= bMin) wMin += 1440;
-        const hrs = Math.round(((wMin - bMin) / 60) * 2) / 2;
+        var hrs = Math.round(((wMin - bMin) / 60) * 2) / 2;
         if (hrs > 0 && hrs <= 18) e.sleepHours = hrs;
       }
       saveDB(null, currentDate);
@@ -1509,21 +1534,23 @@
     document.getElementById('wakeTimeInput').addEventListener('change', recalcSleepTime);
 
     document.getElementById('addCustomTagBtn').addEventListener('click', function() {
-      const inp = document.getElementById('customTagInput');
-      const txt = inp.value.trim();
+      var inp = document.getElementById('customTagInput');
+      var txt = inp.value.trim();
       if (!txt) return;
-      tgHaptic('light');
-      const id = 'custom_' + Date.now();
+      triggerHaptic('light');
+      var id = 'custom_' + Date.now();
       customTags.push({ id: id, label: '✨ ' + txt });
       inp.value = '';
-      getEntry(currentDate).phaseTags.push(id);
-      saveDB(null, currentDate, true);
+      var entry = getEntry(currentDate);
+      if (!Array.isArray(entry.phaseTags)) entry.phaseTags = [];
+      entry.phaseTags.push(id);
+      saveDB(null, currentDate);
       renderCheckin();
     });
 
-    document.querySelectorAll('.med-btn').forEach(btn => {
+    document.querySelectorAll('.med-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        tgHaptic('selection');
+        triggerHaptic('selection');
         getEntry(currentDate).meds = this.getAttribute('data-med');
         saveDB(null, currentDate);
         renderCheckin();
@@ -1535,155 +1562,42 @@
       saveDB(null, currentDate);
     });
 
-    document.getElementById('range14Btn').addEventListener('click', function() { chartDaysRange = 14; renderAnalytics(); });
-    document.getElementById('range30Btn').addEventListener('click', function() { chartDaysRange = 30; renderAnalytics(); });
+    document.getElementById('range14Btn').addEventListener('click', function() {
+      triggerHaptic('selection');
+      chartDaysRange = 14;
+      renderAnalytics();
+    });
+    document.getElementById('range30Btn').addEventListener('click', function() {
+      triggerHaptic('selection');
+      chartDaysRange = 30;
+      renderAnalytics();
+    });
     document.getElementById('printBtn').addEventListener('click', function() { window.print(); });
 
     document.getElementById('resetDemoBtn').addEventListener('click', function() {
-      tgHaptic('medium');
+      triggerHaptic('medium');
       loadDemoData(true);
       renderCheckin();
       renderAnalytics();
       renderReportTable();
-      saveDB('🔄 Загружен 21-дневный демо-сценарий');
-      syncAllToTelegramCloud();
-    });
-    });
-
-    document.getElementById('prevDayBtn').addEventListener('click', function() {
-      const d = new Date(currentDate + 'T12:00:00');
-      d.setDate(d.getDate() - 1);
-      currentDate = formatDateISO(d);
-      renderCheckin();
-    });
-
-    document.getElementById('nextDayBtn').addEventListener('click', function() {
-      const d = new Date(currentDate + 'T12:00:00');
-      d.setDate(d.getDate() + 1);
-      currentDate = formatDateISO(d);
-      renderCheckin();
-    });
-
-    document.getElementById('currentDateInput').addEventListener('change', function() {
-      if (this.value) { currentDate = this.value; renderCheckin(); }
-    });
-
-    document.getElementById('zeroModeBtn').addEventListener('click', function() {
-      zeroMode = !zeroMode;
-      this.classList.toggle('active', zeroMode);
-      document.querySelectorAll('.extra-block').forEach(el => {
-        el.style.display = zeroMode ? 'none' : '';
-      });
-    });
-
-    document.getElementById('moodSlider').addEventListener('input', function() {
-      getEntry(currentDate).mood = parseFloat(this.value);
-      saveDB();
-      renderCheckin();
-    });
-
-    document.getElementById('energySlider').addEventListener('input', function() {
-      getEntry(currentDate).energy = parseFloat(this.value);
-      saveDB();
-      renderCheckin();
-    });
-
-    document.querySelectorAll('#irritabilitySeg .seg-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        getEntry(currentDate).irritability = parseInt(this.getAttribute('data-val'), 10);
-        saveDB();
-        renderCheckin();
-      });
-    });
-
-    document.querySelectorAll('#anxietySeg .seg-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        getEntry(currentDate).anxiety = parseInt(this.getAttribute('data-val'), 10);
-        saveDB();
-        renderCheckin();
-      });
-    });
-
-    document.getElementById('sleepMinusBtn').addEventListener('click', function() {
-      const e = getEntry(currentDate);
-      e.sleepHours = Math.max(0, e.sleepHours - 0.5);
-      saveDB();
-      renderCheckin();
-    });
-
-    document.getElementById('sleepPlusBtn').addEventListener('click', function() {
-      const e = getEntry(currentDate);
-      e.sleepHours = Math.min(18, e.sleepHours + 0.5);
-      saveDB();
-      renderCheckin();
-    });
-
-    function recalcSleepTime() {
-      const e = getEntry(currentDate);
-      const bt = document.getElementById('bedTimeInput').value;
-      const wt = document.getElementById('wakeTimeInput').value;
-      e.bedTime = bt; e.wakeTime = wt;
-      if (bt && wt) {
-        const bParts = bt.split(':').map(Number);
-        const wParts = wt.split(':').map(Number);
-        let bMin = bParts[0] * 60 + bParts[1];
-        let wMin = wParts[0] * 60 + wParts[1];
-        if (wMin <= bMin) wMin += 1440;
-        const hrs = Math.round(((wMin - bMin) / 60) * 2) / 2;
-        if (hrs > 0 && hrs <= 18) e.sleepHours = hrs;
+      if (isTelegramCloud) {
+        pushAllToTelegramCloud('🔄 Демо-сценарий (21 дн.) выгружен в облако');
+      } else {
+        saveDB('🔄 Загружен 21-дневный демо-сценарий');
       }
-      saveDB();
-      renderCheckin();
-    }
-    document.getElementById('bedTimeInput').addEventListener('change', recalcSleepTime);
-    document.getElementById('wakeTimeInput').addEventListener('change', recalcSleepTime);
-
-    document.getElementById('addCustomTagBtn').addEventListener('click', function() {
-      const inp = document.getElementById('customTagInput');
-      const txt = inp.value.trim();
-      if (!txt) return;
-      const id = 'custom_' + Date.now();
-      customTags.push({ id: id, label: '✨ ' + txt });
-      inp.value = '';
-      getEntry(currentDate).phaseTags.push(id);
-      saveDB();
-      renderCheckin();
     });
 
-    document.querySelectorAll('.med-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        getEntry(currentDate).meds = this.getAttribute('data-med');
-        saveDB();
-        renderCheckin();
-      });
-    });
-
-    document.getElementById('notesInput').addEventListener('input', function() {
-      getEntry(currentDate).notes = this.value;
-      saveDB();
-    });
-
-    document.getElementById('range14Btn').addEventListener('click', function() { chartDaysRange = 14; renderAnalytics(); });
-    document.getElementById('range30Btn').addEventListener('click', function() { chartDaysRange = 30; renderAnalytics(); });
-    document.getElementById('printBtn').addEventListener('click', function() { window.print(); });
-
-    document.getElementById('resetDemoBtn').addEventListener('click', function() {
-      loadDemoData(true);
-      renderCheckin();
-      renderAnalytics();
-      renderReportTable();
-      saveDB('🔄 Загружен 21-дневный демо-сценарий');
-    });
-
-    const clearBtn = document.getElementById('clearDbBtn');
+    var clearBtn = document.getElementById('clearDbBtn');
     clearBtn.addEventListener('click', function() {
+      triggerHaptic('medium');
       if (!this.classList.contains('confirming')) {
         this.classList.add('confirming');
         this.textContent = '⚠️ Точно очистить всё? Нажмите еще раз (5 сек)';
         if (clearConfirmTimeout) clearTimeout(clearConfirmTimeout);
-        clearConfirmTimeout = setTimeout(() => {
-          this.classList.remove('confirming');
-          this.textContent = '🗑️ Очистить всю базу с нуля';
+        var self = this;
+        clearConfirmTimeout = setTimeout(function() {
+          self.classList.remove('confirming');
+          self.textContent = '🗑️ Очистить всю базу с нуля';
         }, 5000);
       } else {
         if (clearConfirmTimeout) clearTimeout(clearConfirmTimeout);
@@ -1694,21 +1608,26 @@
     });
 
     document.getElementById('jsonImportInput').addEventListener('change', function(event) {
-      const file = event.target.files[0];
+      var file = event.target.files[0];
       if (!file) return;
-      const reader = new FileReader();
+      var reader = new FileReader();
       reader.onload = function(e) {
         try {
-          const parsed = JSON.parse(e.target.result);
+          var parsed = JSON.parse(e.target.result);
           if (parsed && parsed.db) {
             db = parsed.db;
             customTags = parsed.customTags || [];
             safeSetItem(CLEARED_FLAG_KEY, 'false');
-            saveDB('📂 Бэкап базы успешно загружен!');
-            syncAllToTelegramCloud();
+            safeSetItem(STORAGE_KEY, JSON.stringify(db));
+            safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
             renderCheckin();
             renderAnalytics();
             renderReportTable();
+            if (isTelegramCloud) {
+              pushAllToTelegramCloud('📂 Бэкап загружен и отправлен в Telegram Cloud');
+            } else {
+              saveDB('📂 Бэкап базы успешно загружен!');
+            }
           }
         } catch (err) {
           saveDB('❌ Ошибка чтения JSON файла');
@@ -1718,37 +1637,47 @@
     });
 
     document.getElementById('csvBtn').addEventListener('click', function() {
-      const headers = ['Date','Mood','Energy','Mixed','Irritability','Anxiety','SleepHours','BedTime','WakeTime','Meds','Notes'];
-      const rows = Object.keys(db).sort().map(d => {
-        const e = db[d];
-        return [e.date, e.mood, e.energy, isMixedState(e)?'YES':'NO', e.irritability, e.anxiety, e.sleepHours, e.bedTime||'23:30', e.wakeTime||'07:00', e.meds, '"' + (e.notes||'').replace(/"/g,'""') + '"'].join(',');
+      var headers = ['Date','Mood','Energy','Mixed','Irritability','Anxiety','SleepHours','BedTime','WakeTime','Meds','Notes'];
+      var rows = Object.keys(db).sort().map(function(d) {
+        var e = db[d];
+        return [
+          e.date, e.mood, e.energy, isMixedState(e) ? 'YES' : 'NO',
+          e.irritability, e.anxiety, e.sleepHours,
+          e.bedTime || '23:30', e.wakeTime || '07:00', e.meds,
+          '"' + (e.notes || '').replace(/"/g, '""') + '"'
+        ].join(',');
       });
-      const blob = new Blob(['\uFEFF' + headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-      const a = document.createElement('a');
+      var blob = new Blob(['\uFEFF' + headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'bar2_report_' + currentDate + '.csv';
       a.click();
     });
 
     document.getElementById('jsonExportBtn').addEventListener('click', function() {
-      const blob = new Blob([JSON.stringify({ db: db, customTags: customTags }, null, 2)], { type: 'application/json' });
-      const a = document.createElement('a');
+      var blob = new Blob([JSON.stringify({ db: db, customTags: customTags }, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'bar2_backup_' + currentDate + '.json';
       a.click();
     });
   }
 
-  // Старт приложения
-  loadDemoData(false);
-  saveDB(isTelegramCloud ? '✈️ Telegram Cloud · Подключение...' : '🟢 JS Активен · База загружена');
-  bindEvents();
-  renderCheckin();
-  renderAnalytics();
-  renderReportTable();
-  // Если запущено внутри Telegram Mini App — подтягиваем актуальные записи из облака Telegram
-  if (isTelegramCloud) {
-    hydrateFromTelegramCloud();
+  // ========================================================================
+  // 8. СТАРТ ПРИЛОЖЕНИЯ
+  // ========================================================================
+  try {
+    loadDemoData(false);
+    saveDB(isTelegramCloud ? '✈️ Telegram Cloud · Подключение...' : '🟢 JS Активен · База загружена');
+    bindEvents();
+    renderCheckin();
+    renderAnalytics();
+    renderReportTable();
+    if (isTelegramCloud) {
+      hydrateFromTelegramCloud();
+    }
+  } catch (initErr) {
+    setStatusBadge('❌ Сбой запуска: ' + (initErr && initErr.message ? initErr.message : String(initErr)), '');
   }
 })();
 </script>
