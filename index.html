@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#f3f2ee" />
+  <title>BAR-2 LifeChart | Клинический дневник БАР 2 типа</title>
+  <!-- Подключение официального SDK для работы внутри Telegram Mini App -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    /* ========================================================================
+       ДИЗАЙН-СИСТЕМА: NEO-SWISS EDITORIAL / WARM MINIMALISM
+       ======================================================================== */
+    :root {
+      --bg: #f3f2ee;
+      --surface: rgba(255, 255, 255, 0.94);
+      --surface-solid: #ffffff;
+      --surface-muted: #ebe9e2;
+      --ink: #111111;
+      --text: #111111;
+      --ink-soft: #272725;
+      --text-muted: #6e6d68;
+      --border: rgba(17, 17, 17, 0.12);
+      --border-strong: #111111;
+      --amber: #d98a1f;
+      --amber-soft: rgba(235, 179, 52, 0.18);
+      --coral: #e04f33;
+      --coral-bg: rgba(224, 79, 51, 0.1);
+      --success: #15803d;
+      --success-bg: rgba(21, 128, 61, 0.1);
+      --blue: #2563eb;
+      --blue-bg: rgba(37, 99, 235, 0.1);
+      --radius-card: 26px;
+      --radius-inner: 16px;
+      --radius-pill: 999px;
+      --shadow-card: 0 12px 32px -14px rgba(17, 17, 17, 0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Inter, Roboto, sans-serif;
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 92% 4%, rgba(234, 175, 58, 0.48) 0%, rgba(234, 175, 58, 0.16) 28%, transparent 56%),
+        radial-gradient(circle at 90% 88%, rgba(224, 165, 62, 0.34) 0%, transparent 46%);
+      background-attachment: fixed;
+      color: var(--ink);
+      line-height: 1.45;
+      padding-bottom: 90px;
+      color-scheme: light;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Шапка приложения */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(243, 242, 238, 0.76);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(17, 17, 17, 0.06);
+      padding: 14px 16px 12px;
+    }
+    .header-top {
+      max-width: 820px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.25rem;
+      letter-spacing: -0.035em;
+      color: var(--ink);
+    }
+    .brand-badge {
+      background: var(--ink);
+      color: #ffffff;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+    .save-indicator {
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #92400e;
+      background: rgba(245, 158, 11, 0.16);
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(217, 119, 6, 0.25);
+      font-variant-numeric: tabular-nums;
+    }
+    .save-indicator.ok {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.75);
+      border-color: var(--border);
+    }
+
+    /* Вкладки-капсулы */
+    .nav-tabs {
+      max-width: 820px;
+      margin: 12px auto 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: transparent;
+      padding: 0;
+    }
+    .tab-btn {
+      background: rgba(255, 255, 255, 0.45);
+      color: var(--text-muted);
+      border: 1.2px solid rgba(17, 17, 17, 0.16);
+      padding: 10px 12px;
+      border-radius: var(--radius-pill);
+      font-size: 0.84rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+    .tab-btn:hover {
+      border-color: rgba(17, 17, 17, 0.4);
+      color: var(--ink);
+    }
+    .tab-btn.active {
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--ink);
+      border: 1.5px solid var(--ink);
+      box-shadow: 0 4px 12px -4px rgba(17, 17, 17, 0.12);
+    }
+
+    main { max-width: 820px; margin: 18px auto; padding: 0 16px; }
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    /* Карточки */
+    .card {
+      background: var(--surface);
+      border: 1px solid rgba(17, 17, 17, 0.06);
+      border-radius: var(--radius-card);
+      padding: 20px 22px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-card);
+    }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      color: var(--ink);
+    }
+    .card-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Панель даты и Zero-Energy */
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .date-nav {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface-solid);
+      padding: 5px 6px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border);
+      box-shadow: 0 4px 14px -8px rgba(17, 17, 17, 0.1);
+    }
+    .icon-btn {
+      width: 32px;
+      height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--ink);
+      color: #ffffff;
+      border: none;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: transform 0.12s ease, opacity 0.15s;
+    }
+    .icon-btn:active { transform: scale(0.92); }
+    input[type="date"] {
+      background: transparent;
+      color: var(--ink);
+      border: none;
+      font-size: 0.88rem;
+      font-weight: 700;
+      font-family: inherit;
+      font-variant-numeric: tabular-nums;
+      padding: 0 6px;
+      outline: none;
+    }
+    .zero-btn {
+      background: rgba(255, 255, 255, 0.75);
+      color: var(--ink);
+      border: 1.2px solid var(--border);
+      padding: 9px 16px;
+      border-radius: var(--radius-pill);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .zero-btn.active {
+      background: var(--ink);
+      color: #ffffff;
+      border-color: var(--ink);
+    }
+
+    /* Клинические алерты */
+    .alert-box {
+      padding: 14px 18px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      display: none;
+    }
+    .alert-box.show { display: block; }
+    .alert-danger {
+      background: #fff5f3;
+      border: 1.5px solid var(--coral);
+      color: #7f1d1d;
+    }
+    .alert-warning {
+      background: #fffbeb;
+      border: 1.5px solid #d97706;
+      color: #78350f;
+    }
+    .alert-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+      letter-spacing: -0.015em;
+      margin-bottom: 4px;
+    }
+
+    /* Слайдеры Настроения и Энергии */
+    .slider-group { margin-bottom: 22px; }
+    .slider-group:last-child { margin-bottom: 0; }
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+    .slider-val {
+      font-weight: 700;
+      font-size: 0.84rem;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 12px;
+      border-radius: var(--radius-pill);
+      background: var(--bg);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: linear-gradient(90deg, #64748b 0%, #d6d3cb 50%, #e5a93c 82%, #e04f33 100%);
+      outline: none;
+      margin: 10px 0;
+      cursor: pointer;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: var(--ink);
+      border: 3px solid #ffffff;
+      box-shadow: 0 3px 10px rgba(17, 17, 17, 0.28);
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+    input[type="range"]::-webkit-slider-thumb:active { transform: scale(1.12); }
+    .scale-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Сегментированные кнопки (0..3) */
+    .seg-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(17, 17, 17, 0.07);
+    }
+    @media (max-width: 560px) { .seg-row { grid-template-columns: 1fr; } }
+    .seg-control {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      background: var(--bg);
+      padding: 4px;
+      border-radius: var(--radius-pill);
+      margin-top: 8px;
+      border: 1px solid rgba(17, 17, 17, 0.06);
+    }
+    .seg-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid transparent;
+      padding: 8px 4px;
+      border-radius: var(--radius-pill);
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .seg-btn.active-0 { background: #ffffff; color: var(--ink); border-color: var(--border); box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .seg-btn.active-1 { background: #fef3c7; color: #92400e; border-color: #f59e0b; }
+    .seg-btn.active-2 { background: #ffedd5; color: #9a3412; border-color: #ea580c; }
+    .seg-btn.active-3 { background: var(--coral); color: #ffffff; border-color: var(--coral); }
+
+    /* Блок сна */
+    .sleep-controls {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      background: var(--bg);
+      padding: 14px 16px;
+      border-radius: 20px;
+      margin-bottom: 14px;
+    }
+    .stepper { display: flex; align-items: center; gap: 12px; }
+    .step-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: none;
+      background: var(--ink);
+      color: #ffffff;
+      font-size: 1.2rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.12s ease;
+    }
+    .step-btn:active { transform: scale(0.92); }
+    .sleep-hours-val {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      min-width: 82px;
+      text-align: center;
+      color: var(--ink);
+    }
+    .time-inputs { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+    input[type="time"] {
+      background: #ffffff;
+      color: var(--ink);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: var(--radius-pill);
+      font-family: inherit;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Чипы / Теги */
+    .chips-wrap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .chip {
+      background: #ffffff;
+      color: var(--ink-soft);
+      border: 1px solid rgba(17, 17, 17, 0.16);
+      padding: 8px 14px;
+      border-radius: var(--radius-pill);
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.14s ease;
+    }
+    .chip:hover { border-color: rgba(17, 17, 17, 0.45); }
+    .chip.active { background: var(--ink); color: #ffffff; border-color: var(--ink); font-weight: 600; }
+    .chip.hypo.active { background: #fef3c7; color: #92400e; border-color: #d97706; font-weight: 600; }
+    .chip.depr.active { background: var(--blue-bg); color: #1e40af; border-color: var(--blue); font-weight: 600; }
+    .chip.danger.active { background: var(--coral); color: #ffffff; border-color: var(--coral); font-weight: 600; }
+
+    /* Прием терапии */
+    .meds-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    @media (max-width: 500px) { .meds-grid { grid-template-columns: 1fr; } }
+    .med-btn {
+      background: var(--bg);
+      color: var(--text-muted);
+      border: 1.2px solid transparent;
+      padding: 11px 10px;
+      border-radius: var(--radius-pill);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .med-btn.active-full { background: var(--ink); color: #ffffff; border-color: var(--ink); }
+    .med-btn.active-part { background: #fef3c7; color: #92400e; border-color: #d97706; }
+    .med-btn.active-missed { background: var(--coral); color: #ffffff; border-color: var(--coral); }
+
+    textarea, .text-input {
+      width: 100%;
+      background: var(--bg);
+      color: var(--ink);
+      border: 1px solid rgba(17, 17, 17, 0.12);
+      border-radius: 16px;
+      padding: 11px 14px;
+      font-family: inherit;
+      font-size: 0.86rem;
+      outline: none;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    textarea:focus, .text-input:focus {
+      background: #ffffff;
+      border-color: var(--ink);
+    }
+
+    /* KPI карточки */
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+    @media (max-width: 620px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .kpi-card {
+      background: var(--surface-solid);
+      border: 1px solid rgba(17, 17, 17, 0.06);
+      padding: 16px 18px;
+      border-radius: 22px;
+      box-shadow: var(--shadow-card);
+    }
+    .kpi-label { font-size: 0.74rem; color: var(--text-muted); font-weight: 600; }
+    .kpi-val {
+      font-size: 1.85rem;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      font-variant-numeric: tabular-nums;
+      margin-top: 6px;
+      color: var(--ink) !important;
+    }
+
+    /* График NIMH — темная контрастная панель */
+    .svg-chart-container {
+      width: 100%;
+      overflow-x: auto;
+      background: #111111;
+      border-radius: 22px;
+      padding: 16px 12px;
+      border: 1px solid #222222;
+      box-shadow: 0 14px 30px -12px rgba(17, 17, 17, 0.35);
+    }
+    .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 10px; font-weight: 500; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+
+    /* Таблица и кнопки отчета */
+    .report-table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+    th, td { padding: 11px 10px; border-bottom: 1px solid rgba(17, 17, 17, 0.08); text-align: left; }
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      background: var(--bg);
+    }
+    th:first-child { border-radius: 10px 0 0 10px; }
+    th:last-child { border-radius: 0 10px 10px 0; }
+
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .action-btn {
+      background: #ffffff;
+      color: var(--ink);
+      border: 1.2px solid rgba(17, 17, 17, 0.18);
+      padding: 9px 16px;
+      border-radius: var(--radius-pill);
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .action-btn:hover { border-color: var(--ink); }
+    .action-btn:active { transform: scale(0.97); }
+    .action-btn.primary { background: var(--ink); color: #ffffff; border-color: var(--ink); }
+    .action-btn.danger-btn {
+      background: #fff5f3;
+      color: var(--coral);
+      border-color: rgba(224, 79, 51, 0.4);
+    }
+    .action-btn.danger-btn.confirming {
+      background: var(--coral);
+      color: #ffffff;
+      border-color: var(--coral);
+      box-shadow: 0 6px 16px -4px rgba(224, 79, 51, 0.45);
+    }
+
+    /* Цветовые заголовки групп маркеров */
+    .section-label-hypo { font-size: 0.82rem; font-weight: 700; color: #b45309; margin-top: 4px; }
+    .section-label-depr { font-size: 0.82rem; font-weight: 700; color: #1d4ed8; margin-top: 14px; }
+    .section-label-safety { font-size: 0.82rem; font-weight: 700; color: #dc2626; margin-top: 14px; }
+
+    @media print {
+      body { background: #fff !important; color: #000; padding: 0; }
+      header, .no-print { display: none !important; }
+      .view-section { display: block !important; }
+      #view-checkin { display: none !important; }
+      .card, .kpi-card {
+        background: #fff !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: none !important;
+        break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="brand">
+      <span>🧠 BAR-2 LifeChart</span>
+      <span class="brand-badge">NIMH + IPSRT</span>
+    </div>
+    <div id="saveBadge" class="save-indicator">⚠️ Скрипты заблокированы просмотрщиком (откройте в браузере)</div>
+  </div>
+  <nav class="nav-tabs no-print">
+    <button type="button" class="tab-btn active" data-tab="checkin">⚡ Чек-ин (15 сек)</button>
+    <button type="button" class="tab-btn" data-tab="chart">📈 График NIMH</button>
+    <button type="button" class="tab-btn" data-tab="report">📋 Отчет врачу</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ВКЛАДКА 1: ЕЖЕДНЕВНЫЙ ВВОД -->
+  <section id="view-checkin" class="view-section active">
+    <div class="toolbar">
+      <div class="date-nav">
+        <button type="button" class="icon-btn" id="prevDayBtn" title="Предыдущий день">◀</button>
+        <input type="date" id="currentDateInput" />
+        <button type="button" class="icon-btn" id="nextDayBtn" title="Следующий день">▶</button>
+      </div>
+      <button type="button" id="zeroModeBtn" class="zero-btn">
+        🔋 Нет сил? Режим «Только 2 шкалы»
+      </button>
+    </div>
+
+    <div id="mixedAlert" class="alert-box alert-danger">
+      <div class="alert-title">⚠️ Детектор смешанного состояния (Дисфорическая активация)</div>
+      <div>Настроение снижено на фоне повышенной энергии или ажитации. Высокий риск импульсивных действий — сверьтесь с кризисным планом врача.</div>
+    </div>
+
+    <div id="hypoAlert" class="alert-box alert-warning">
+      <div class="alert-title">🚩 Ранний маркер гипомании (Хронобиологический триггер)</div>
+      <div>Сокращение сна (&lt; 5.5 ч) в сочетании с подъемом энергии или отсутствием усталости.</div>
+    </div>
+
+    <div id="safetyAlert" class="alert-box alert-danger">
+      <div class="alert-title">🆘 Экстренная поддержка</div>
+      <div>Вы отметили суицидальные импульсы. Пожалуйста, свяжитесь с врачом, близким человеком или позвоните в службу помощи: <strong>8-800-2000-122</strong> или <strong>112</strong>.</div>
+    </div>
+
+    <!-- Блок А: Основные шкалы -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🎚️ Блок А: Настроение и Энергия</div>
+          <div class="card-subtitle">Раздельный трекинг аффекта и моторной активации</div>
+        </div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span><strong>Настроение (Фон)</strong></span>
+          <span id="moodLabel" class="slider-val">0 · Эутимия (Ровно)</span>
+        </div>
+        <input type="range" id="moodSlider" min="-3" max="3" step="0.5" value="0" />
+        <div class="scale-labels">
+          <span>-3 Тяж. депрессия</span>
+          <span>0 Ровно</span>
+          <span>+2 Гипомания</span>
+          <span>+3 Потеря контроля</span>
+        </div>
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <span><strong>Энергия / Психомоторика</strong></span>
+          <span id="energyLabel" class="slider-val">0 · Нормальный тонус</span>
+        </div>
+        <input type="range" id="energySlider" min="-3" max="3" step="0.5" value="0" />
+        <div class="scale-labels">
+          <span>-3 Полный ступор</span>
+          <span>0 Норма</span>
+          <span>+3 Ажитация / Гонка</span>
+        </div>
+      </div>
+
+      <div class="seg-row extra-block">
+        <div>
+          <div style="font-size:0.84rem; font-weight:600;">⚡ Раздражительность / Дисфория</div>
+          <div class="seg-control" id="irritabilitySeg">
+            <button type="button" class="seg-btn" data-val="0">0 Нет</button>
+            <button type="button" class="seg-btn" data-val="1">1 Легкая</button>
+            <button type="button" class="seg-btn" data-val="2">2 Сильная</button>
+            <button type="button" class="seg-btn" data-val="3">3 Гнев</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:0.84rem; font-weight:600;">🌀 Тревога / Ажитация</div>
+          <div class="seg-control" id="anxietySeg">
+            <button type="button" class="seg-btn" data-val="0">0 Спокоен</button>
+            <button type="button" class="seg-btn" data-val="1">1 Фоновая</button>
+            <button type="button" class="seg-btn" data-val="2">2 Острая</button>
+            <button type="button" class="seg-btn" data-val="3">3 Паника</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Блок Б: Сон -->
+    <div class="card extra-block">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🌙 Блок Б: Сон и Циркадный ритм (IPSRT)</div>
+          <div class="card-subtitle">Главный биологический предиктор смены фазы</div>
+        </div>
+      </div>
+
+      <div class="sleep-controls">
+        <div class="stepper">
+          <button type="button" class="step-btn" id="sleepMinusBtn">−</button>
+          <div id="sleepHoursDisplay" class="sleep-hours-val">7.5 ч</div>
+          <button type="button" class="step-btn" id="sleepPlusBtn">+</button>
+        </div>
+        <div class="time-inputs">
+          <label>Лег: <input type="time" id="bedTimeInput" value="23:30" /></label>
+          <label>Встал: <input type="time" id="wakeTimeInput" value="07:00" /></label>
+        </div>
+      </div>
+
+      <div class="chips-wrap" id="sleepTagsWrap"></div>
+    </div>
+
+    <!-- Блок В: Маркеры фаз -->
+    <div class="card extra-block">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🏷️ Блок В: Специфические маркеры фаз</div>
+          <div class="card-subtitle">Быстрые чекбоксы симптомов и предвестников</div>
+        </div>
+      </div>
+
+      <div class="section-label-hypo">🔼 Маркеры гипомании и ускорения:</div>
+      <div class="chips-wrap" id="hypoTagsWrap"></div>
+
+      <div class="section-label-depr">🔽 Маркеры депрессии и истощения:</div>
+      <div class="chips-wrap" id="deprTagsWrap"></div>
+
+      <div style="display:flex; gap:6px; margin-top:14px;">
+        <input type="text" id="customTagInput" class="text-input" placeholder="+ Добавить свой маркер фазы..." />
+        <button type="button" class="action-btn" id="addCustomTagBtn">Добавить</button>
+      </div>
+
+      <div class="section-label-safety">🛡️ Безопасность и суточные качели:</div>
+      <div class="chips-wrap" id="safetyTagsWrap"></div>
+    </div>
+
+    <!-- Блок Г: Терапия и триггеры -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">💊 Блок Г: Фармакотерапия и Триггеры</div>
+          <div class="card-subtitle">Контроль комплаенса и внешних факторов</div>
+        </div>
+      </div>
+
+      <div class="meds-grid">
+        <button type="button" id="medFull" class="med-btn" data-med="full">✅ Принял всё по схеме</button>
+        <button type="button" id="medPart" class="med-btn" data-med="partial">⚠️ Частично (утро/вечер)</button>
+        <button type="button" id="medMissed" class="med-btn" data-med="missed">❌ Пропустил приём</button>
+      </div>
+
+      <div class="extra-block">
+        <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:6px;">Внешние факторы и СОС-препараты:</div>
+        <div class="chips-wrap" id="triggerTagsWrap"></div>
+        <div style="margin-top:14px;">
+          <textarea id="notesInput" rows="2" placeholder="Опциональная заметка за день..."></textarea>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ВКЛАДКА 2: ГРАФИК NIMH -->
+  <section id="view-chart" class="view-section">
+    <div class="kpi-grid" id="kpiContainer"></div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">📊 Двухлинейная карта NIMH Life Chart</div>
+          <div class="card-subtitle">Настроение vs Энергия + Гистограмма сна</div>
+        </div>
+        <div class="btn-row no-print">
+          <button type="button" class="action-btn" id="range14Btn">14 дней</button>
+          <button type="button" class="action-btn" id="range30Btn">30 дней</button>
+        </div>
+      </div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="dot" style="background:#60a5fa"></span> Настроение (-3..+3)</span>
+        <span class="legend-item"><span class="dot" style="background:#f59e0b"></span> Энергия (-3..+3)</span>
+        <span class="legend-item"><span class="dot" style="background:#ef4444"></span> Смешанная фаза</span>
+        <span class="legend-item"><span class="dot" style="background:#38bdf8"></span> Часы сна</span>
+      </div>
+      <div class="svg-chart-container" id="svgChartBox"></div>
+    </div>
+  </section>
+
+  <!-- ВКЛАДКА 3: ОТЧЕТ ВРАЧУ И УПРАВЛЕНИЕ БАЗОЙ -->
+  <section id="view-report" class="view-section">
+    <div class="card no-print">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🗂️ Экспорт для врача и управление локальной базой</div>
+          <div class="card-subtitle">Выгрузка клинических отчетов, резервное копирование и очистка демо-данных</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="action-btn primary" id="printBtn">🖨️ Печать / PDF</button>
+        <button type="button" class="action-btn" id="csvBtn">📊 Скачать CSV</button>
+        <button type="button" class="action-btn" id="jsonExportBtn">💾 Бэкап JSON</button>
+        <label class="action-btn" style="cursor:pointer;">
+          📂 Загрузить JSON
+          <input type="file" id="jsonImportInput" accept=".json" style="display:none" />
+        </label>
+        <button type="button" class="action-btn" id="resetDemoBtn">🔄 Демо-данные (21 дн.)</button>
+        <button type="button" class="action-btn danger-btn" id="clearDbBtn">🗑️ Очистить всю базу с нуля</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">📋 Клиническая сводка по дням (<span id="totalDaysCount">0</span> дн.)</div>
+          <div class="card-subtitle">Хронологический журнал состояния, сна, терапии и триггеров</div>
+        </div>
+      </div>
+      <div class="report-table-wrap">
+        <table id="reportTable">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Настр.</th>
+              <th>Энерг.</th>
+              <th>Р / Т</th>
+              <th>Сон</th>
+              <th>Терапия</th>
+              <th>Маркеры и заметки</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+(function() {
+  // ========================================================================
+  // ИНИЦИАЛИЗАЦИЯ TELEGRAM MINI APP И ГИБРИДНОГО ХРАНИЛИЩА (CLOUD + LOCAL)
+  // ========================================================================
+  const tg = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+  // Проверяем, что приложение действительно открыто внутри Telegram и поддерживает CloudStorage (v6.9+)
+  const isTelegramCloud = Boolean(
+    tg &&
+    tg.initData &&
+    tg.initData.length > 0 &&
+    tg.CloudStorage &&
+    typeof tg.isVersionAtLeast === 'function' &&
+    tg.isVersionAtLeast('6.9')
+  );
+
+  if (tg && tg.initData && tg.initData.length > 0) {
+    try {
+      tg.ready();
+      tg.expand();
+      if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor('#f3f2ee');
+      if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor('#f3f2ee');
+    } catch (e) {}
+  }
+
+  // Тактильный отклик (Haptic Feedback) для нативного ощущения в Telegram на смартфоне
+  function tgHaptic(type) {
+    if (!tg || !tg.HapticFeedback) return;
+    try {
+      if (type === 'selection') tg.HapticFeedback.selectionChanged();
+      else tg.HapticFeedback.impactOccurred(type || 'light');
+    } catch (e) {}
+  }
+
+  // Безопасная обертка хранилища (localStorage + RAM Fallback при блокировке file://)
+  let memoryFallback = {};
+  let storageAvailable = false;
+  try {
+    const testKey = '__bar2_test__';
+    window.localStorage.setItem(testKey, '1');
+    window.localStorage.removeItem(testKey);
+    storageAvailable = true;
+  } catch (e) {
+    storageAvailable = false;
+  }
+
+  function safeGetItem(key) {
+    if (storageAvailable) {
+      try { return window.localStorage.getItem(key); } catch (e) { return null; }
+    }
+    return memoryFallback[key] || null;
+  }
+
+  function safeSetItem(key, val) {
+    if (storageAvailable) {
+      try { window.localStorage.setItem(key, val); return; } catch (e) {}
+    }
+    memoryFallback[key] = val;
+  }
+
+  // Константы ключей для Telegram CloudStorage (1 день = 1 ключ, лимит 1024 ключа ≈ 2.8 года)
+  const TG_DAY_PREFIX = 'd_';
+  const TG_TAGS_KEY = 'meta_tags';
+  const TG_CLEARED_KEY = 'meta_cleared';
+  const cloudDebounceTimers = {};
+
+  function setStatusBadge(text) {
+    const badge = document.getElementById('saveBadge');
+    if (!badge) return;
+    badge.className = 'save-indicator ok';
+    badge.textContent = text;
+  }
+
+  // Отложенная отправка одного ключа в Telegram CloudStorage (чтобы не спамить API при движении слайдера)
+  function syncKeyToTelegramCloud(key, valueStr) {
+    if (!isTelegramCloud) return;
+    if (cloudDebounceTimers[key]) clearTimeout(cloudDebounceTimers[key]);
+    setStatusBadge('✈️ Telegram Cloud · Синхронизация...');
+    cloudDebounceTimers[key] = setTimeout(function() {
+      try {
+        tg.CloudStorage.setItem(key, valueStr, function(err) {
+          if (err) {
+            setStatusBadge('⚠️ Облако недоступно (сохранено локально)');
+          } else {
+            const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            setStatusBadge('✈️ Telegram Cloud · Синхронизировано ' + t);
+          }
+        });
+      } catch (e) {}
+    }, 450);
+  }
+
+  // Пакетная выгрузка всей базы в Telegram CloudStorage (при импорте JSON или загрузке демо)
+  function syncAllToTelegramCloud(callback) {
+    if (!isTelegramCloud) {
+      if (callback) callback();
+      return;
+    }
+    setStatusBadge('✈️ Telegram Cloud · Выгрузка базы...');
+    const entriesToPush = Object.keys(db).map(function(dateStr) {
+      return { key: TG_DAY_PREFIX + dateStr, val: JSON.stringify(db[dateStr]) };
+    });
+    entriesToPush.push({ key: TG_TAGS_KEY, val: JSON.stringify(customTags) });
+    entriesToPush.push({ key: TG_CLEARED_KEY, val: safeGetItem(CLEARED_FLAG_KEY) || 'false' });
+
+    let idx = 0;
+    function pushNext() {
+      if (idx >= entriesToPush.length) {
+        const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setStatusBadge('✈️ Telegram Cloud · База синхронизирована ' + t);
+        if (callback) callback();
+        return;
+      }
+      const item = entriesToPush[idx++];
+      try {
+        tg.CloudStorage.setItem(item.key, item.val, function() {
+          pushNext();
+        });
+      } catch (e) {
+        pushNext();
+      }
+    }
+    pushNext();
+  }
+
+  // Очистка всех ключей дней в Telegram CloudStorage
+  function clearTelegramCloud(callback) {
+    if (!isTelegramCloud) {
+      if (callback) callback();
+      return;
+    }
+    setStatusBadge('✈️ Telegram Cloud · Очистка облака...');
+    try {
+      tg.CloudStorage.getKeys(function(err, keys) {
+        if (err || !Array.isArray(keys)) {
+          if (callback) callback();
+          return;
+        }
+        const dayKeys = keys.filter(function(k) { return k.indexOf(TG_DAY_PREFIX) === 0; });
+        const finishClear = function() {
+          tg.CloudStorage.setItem(TG_CLEARED_KEY, 'true', function() {
+            tg.CloudStorage.setItem(TG_DAY_PREFIX + currentDate, JSON.stringify(db[currentDate]), function() {
+              if (callback) callback();
+            });
+          });
+        };
+        if (dayKeys.length > 0) {
+          tg.CloudStorage.removeItems(dayKeys, function() { finishClear(); });
+        } else {
+          finishClear();
+        }
+      });
+    } catch (e) {
+      if (callback) callback();
+    }
+  }
+
+  // Загрузка и слияние данных из Telegram CloudStorage при старте приложения
+  function hydrateFromTelegramCloud() {
+    if (!isTelegramCloud) return;
+    setStatusBadge('✈️ Telegram Cloud · Загрузка записей...');
+    try {
+      tg.CloudStorage.getKeys(function(err, keys) {
+        if (err || !Array.isArray(keys) || keys.length === 0) {
+          setStatusBadge('✈️ Telegram Cloud · Готово (облако пока пустое)');
+          return;
+        }
+
+        // Читаем ключи пачками по 50 штук (безопасно для лимитов Telegram)
+        const chunks = [];
+        for (let i = 0; i < keys.length; i += 50) {
+          chunks.push(keys.slice(i, i + 50));
+        }
+
+        const cloudValues = {};
+        let cIdx = 0;
+
+        function fetchNextChunk() {
+          if (cIdx >= chunks.length) {
+            applyCloudData(cloudValues);
+            return;
+          }
+          tg.CloudStorage.getItems(chunks[cIdx++], function(getErr, values) {
+            if (!getErr && values) {
+              Object.keys(values).forEach(function(k) {
+                cloudValues[k] = values[k];
+              });
+            }
+            fetchNextChunk();
+          });
+        }
+
+        fetchNextChunk();
+      });
+    } catch (e) {
+      setStatusBadge('⚠️ Ошибка чтения Telegram Cloud');
+    }
+  }
+
+  function applyCloudData(cloudValues) {
+    const cloudCleared = cloudValues[TG_CLEARED_KEY] === 'true';
+    const dayKeys = Object.keys(cloudValues).filter(function(k) {
+      return k.indexOf(TG_DAY_PREFIX) === 0 && cloudValues[k];
+    });
+
+    if (cloudValues[TG_TAGS_KEY]) {
+      try {
+        const parsedTags = JSON.parse(cloudValues[TG_TAGS_KEY]);
+        if (Array.isArray(parsedTags)) customTags = parsedTags;
+      } catch (e) {}
+    }
+
+    if (dayKeys.length > 0 || cloudCleared) {
+      // Если в облаке есть реальные записи или флаг очистки — заменяем локальный кэш данными из облака
+      const nextDb = {};
+      dayKeys.forEach(function(k) {
+        try {
+          const parsedDay = JSON.parse(cloudValues[k]);
+          if (parsedDay && parsedDay.date) {
+            nextDb[parsedDay.date] = parsedDay;
+          }
+        } catch (e) {}
+      });
+      if (Object.keys(nextDb).length === 0) {
+        nextDb[currentDate] = defaultEntry(currentDate);
+      }
+      db = nextDb;
+      safeSetItem(CLEARED_FLAG_KEY, cloudCleared ? 'true' : 'false');
+      safeSetItem(STORAGE_KEY, JSON.stringify(db));
+      safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
+
+      renderCheckin();
+      renderAnalytics();
+      renderReportTable();
+    }
+
+    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    setStatusBadge('✈️ Telegram Cloud · Синхронизировано (' + Object.keys(db).length + ' дн.) ' + t);
+  }
+
+  // Справочники клинических тегов
+  const SLEEP_TAGS = [
+    { id: 'insomnia', label: 'Трудно уснуть / Бессонница' },
+    { id: 'broken', label: 'Прерывистый / Раннее пробуждение' },
+    { id: 'hypersomnia', label: 'Гиперсомния (10–14ч и нет сил)' },
+    { id: 'no_need_sleep', label: '🚩 Мало спал, но полон сил!', danger: true }
+  ];
+  const HYPO_TAGS = [
+    { id: 'fast_speech', label: 'Ускоренная речь' },
+    { id: 'racing_thoughts', label: 'Скачка идей в голове' },
+    { id: 'impulsive_spend', label: 'Импульсивные траты' },
+    { id: 'hypersex', label: 'Гиперсексуальность' },
+    { id: 'many_projects', label: 'Взялся за кучу проектов' },
+    { id: 'oversocial', label: 'Повышенная общительность' }
+  ];
+  const DEPR_TAGS = [
+    { id: 'anhedonia', label: 'Ангедония (ничего не радует)' },
+    { id: 'guilt', label: 'Чувство вины' },
+    { id: 'brain_fog', label: 'Туман в голове' },
+    { id: 'lead_body', label: 'Свинцовая тяжесть в теле' },
+    { id: 'isolation', label: 'Изоляция' }
+  ];
+  const SAFETY_TAGS = [
+    { id: 'diurnal_swing', label: '🎢 Резкие качели внутри дня (утро ≠ вечер)' },
+    { id: 'passive_si', label: 'Пассивные мысли («хочется исчезнуть»)', danger: true },
+    { id: 'active_si', label: '🆘 Активные суицидальные импульсы', danger: true }
+  ];
+  const TRIGGER_TAGS = [
+    { id: 'sos_med', label: '💊 Принял СОС-препарат' },
+    { id: 'stress', label: '⚡ Острый стресс / Конфликт' },
+    { id: 'caffeine', label: '☕ Много кофеина' },
+    { id: 'alcohol', label: '🍷 Алкоголь / ПАВ' },
+    { id: 'jetlag', label: '🌍 Сбой режима / Ночная смена' },
+    { id: 'cycle', label: '🩸 ПМС / Начало цикла' }
+  ];
+
+  const MOOD_DESC = {
+    "-3": "-3 · Тяжелая депрессия", "-2.5": "-2.5 · Выраженная депрессия",
+    "-2": "-2 · Умеренная депрессия", "-1.5": "-1.5 · Субдепрессия",
+    "-1": "-1 · Сниженный фон", "-0.5": "-0.5 · Легкая меланхолия",
+    "0": "0 · Эутимия (Ровно)", "0.5": "+0.5 · Приятный тонус",
+    "1": "+1 · Легкий подъем", "1.5": "+1.5 · Умеренная гипомания",
+    "2": "+2 · Выраженная гипомания", "2.5": "+2.5 · Сильный разгон",
+    "3": "+3 · Тяжелая гипомания"
+  };
+
+  const ENERGY_DESC = {
+    "-3": "-3 · Полный ступор", "-2.5": "-2.5 · Крайнее истощение",
+    "-2": "-2 · Выраженная апатия", "-1.5": "-1.5 · Вялость",
+    "-1": "-1 · Сниженная энергия", "-0.5": "-0.5 · Слегка сонный",
+    "0": "0 · Нормальный тонус", "0.5": "+0.5 · Бодрый",
+    "1": "+1 · Высокая активность", "1.5": "+1.5 · Ускорение",
+    "2": "+2 · Гиперактивность", "2.5": "+2.5 · Моторный разгон",
+    "3": "+3 · Экстремальная ажитация"
+  };
+
+  const STORAGE_KEY = 'bar2_lifechart_db_v2';
+  const CUSTOM_TAGS_KEY = 'bar2_custom_tags_v2';
+  const CLEARED_FLAG_KEY = 'bar2_user_cleared_v2';
+
+  let db = {};
+  let customTags = [];
+  let currentDate = formatDateISO(new Date());
+  let zeroMode = false;
+  let chartDaysRange = 30;
+  let clearConfirmTimeout = null;
+
+  function formatDateISO(d) {
+    const off = d.getTimezoneOffset();
+    const local = new Date(d.getTime() - off * 60 * 1000);
+    return local.toISOString().split('T')[0];
+  }
+
+  function defaultEntry(dateStr) {
+    return {
+      date: dateStr, mood: 0, energy: 0, irritability: 0, anxiety: 0,
+      sleepHours: 7.5, bedTime: '23:30', wakeTime: '07:00',
+      sleepTags: [], phaseTags: [], safetyTags: [],
+      meds: 'full', triggers: [], notes: ''
+    };
+  }
+
+  // Загрузка сохраненной базы или 21-дневного клинического демо-сценария
+  function loadDemoData(force) {
+    const raw = safeGetItem(STORAGE_KEY);
+    const wasCleared = safeGetItem(CLEARED_FLAG_KEY) === 'true';
+
+    if (!force && (raw || wasCleared)) {
+      try {
+        db = raw ? (JSON.parse(raw) || {}) : {};
+        customTags = JSON.parse(safeGetItem(CUSTOM_TAGS_KEY) || '[]');
+        if (Object.keys(db).length === 0) {
+          db[currentDate] = defaultEntry(currentDate);
+        }
+        return;
+      } catch (e) {}
+    }
+
+    safeSetItem(CLEARED_FLAG_KEY, 'false');
+    db = {};
+    const scenario = [
+      { d: -20, m: -2.0, e: -2.5, ir: 0, ax: 1, sh: 11.0, bt: '00:30', wt: '11:30', st: ['hypersomnia'], pt: ['anhedonia','lead_body'], sf: [], md: 'full', tr: [], nt: 'Тяжело встать, гиперсомния' },
+      { d: -19, m: -2.5, e: -2.5, ir: 0, ax: 1, sh: 11.5, bt: '01:00', wt: '12:30', st: ['hypersomnia'], pt: ['anhedonia','brain_fog'], sf: ['passive_si'], md: 'partial', tr: [], nt: 'Пропустил утро' },
+      { d: -18, m: -2.0, e: -2.0, ir: 1, ax: 1, sh: 10.0, bt: '00:30', wt: '10:30', st: ['hypersomnia'], pt: ['anhedonia'], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -17, m: -1.5, e: -1.5, ir: 0, ax: 1, sh: 9.5, bt: '00:00', wt: '09:30', st: [], pt: ['brain_fog'], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -16, m: -1.0, e: -1.0, ir: 0, ax: 0, sh: 8.5, bt: '23:30', wt: '08:00', st: [], pt: [], sf: ['diurnal_swing'], md: 'full', tr: [], nt: '' },
+      { d: -15, m: -0.5, e: -0.5, ir: 0, ax: 0, sh: 8.0, bt: '23:30', wt: '07:30', st: [], pt: [], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -14, m: 0.0, e: 0.0, ir: 0, ax: 0, sh: 7.5, bt: '23:30', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: 'Выход в эутимию' },
+      { d: -13, m: 0.0, e: 0.5, ir: 0, ax: 0, sh: 7.5, bt: '23:30', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -12, m: 0.5, e: 0.5, ir: 0, ax: 0, sh: 7.0, bt: '00:00', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -11, m: 0.0, e: 0.0, ir: 0, ax: 0, sh: 7.5, bt: '23:30', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -10, m: 1.0, e: 1.5, ir: 0, ax: 0, sh: 6.0, bt: '01:30', wt: '07:30', st: [], pt: ['oversocial'], sf: [], md: 'full', tr: ['caffeine'], nt: 'Долго не ложился' },
+      { d: -9, m: 1.5, e: 2.0, ir: 1, ax: 0, sh: 5.0, bt: '02:30', wt: '07:30', st: ['no_need_sleep'], pt: ['racing_thoughts','many_projects'], sf: [], md: 'full', tr: ['caffeine'], nt: 'Спал 5ч, полон сил' },
+      { d: -8, m: 2.0, e: 2.5, ir: 1, ax: 1, sh: 4.5, bt: '03:00', wt: '07:30', st: ['no_need_sleep'], pt: ['fast_speech','racing_thoughts','impulsive_spend'], sf: [], md: 'missed', tr: ['jetlag'], nt: 'Импульсивные покупки ночью' },
+      { d: -7, m: 2.0, e: 2.5, ir: 2, ax: 1, sh: 4.5, bt: '03:00', wt: '07:30', st: ['no_need_sleep','insomnia'], pt: ['fast_speech','racing_thoughts'], sf: [], md: 'partial', tr: [], nt: '' },
+      { d: -6, m: -1.0, e: 2.0, ir: 3, ax: 2, sh: 5.0, bt: '02:30', wt: '07:30', st: ['insomnia','broken'], pt: ['racing_thoughts','guilt'], sf: ['diurnal_swing'], md: 'full', tr: ['stress'], nt: 'Смешанная фаза: спад настроения при разгоне' },
+      { d: -5, m: -1.5, e: 2.0, ir: 3, ax: 3, sh: 4.5, bt: '03:00', wt: '07:30', st: ['insomnia','broken'], pt: ['racing_thoughts','anhedonia'], sf: ['passive_si'], md: 'full', tr: ['stress','sos_med'], nt: 'Сильная ажитация + тоска, принял СОС' },
+      { d: -4, m: -1.5, e: 1.5, ir: 2, ax: 2, sh: 6.5, bt: '01:00', wt: '07:30', st: ['broken'], pt: ['brain_fog'], sf: [], md: 'full', tr: ['sos_med'], nt: '' },
+      { d: -3, m: -1.0, e: 0.0, ir: 1, ax: 1, sh: 8.0, bt: '23:30', wt: '07:30', st: [], pt: ['brain_fog'], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -2, m: -0.5, e: -0.5, ir: 0, ax: 1, sh: 8.0, bt: '23:30', wt: '07:30', st: [], pt: [], sf: [], md: 'full', tr: [], nt: '' },
+      { d: -1, m: 0.0, e: 0.0, ir: 0, ax: 0, sh: 7.5, bt: '23:30', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: '' },
+      { d: 0, m: 0.0, e: 0.5, ir: 0, ax: 0, sh: 7.5, bt: '23:30', wt: '07:00', st: [], pt: [], sf: [], md: 'full', tr: [], nt: 'Сегодняшний день (демо)' }
+    ];
+
+    const today = new Date();
+    scenario.forEach(item => {
+      const dt = new Date(today);
+      dt.setDate(today.getDate() + item.d);
+      const iso = formatDateISO(dt);
+      db[iso] = {
+        date: iso, mood: item.m, energy: item.e, irritability: item.ir, anxiety: item.ax,
+        sleepHours: item.sh, bedTime: item.bt, wakeTime: item.wt,
+        sleepTags: item.st, phaseTags: item.pt, safetyTags: item.sf,
+        meds: item.md, triggers: item.tr, notes: item.nt
+      };
+    });
+    saveDB();
+  }
+
+  // Полная очистка базы с нуля
+  function clearDatabaseFromScratch() {
+    db = {};
+    currentDate = formatDateISO(new Date());
+    db[currentDate] = defaultEntry(currentDate);
+    safeSetItem(CLEARED_FLAG_KEY, 'true');
+    saveDB('✨ База полностью очищена! Начат чистый дневник с ' + currentDate);
+    clearTelegramCloud(function() {
+      if (isTelegramCloud) {
+        setStatusBadge('✈️ Telegram Cloud · Облако очищено');
+      }
+    });
+    renderCheckin();
+    renderAnalytics();
+    renderReportTable();
+  }
+
+  function saveDB(customMessage, changedDate, syncTags) {
+    safeSetItem(STORAGE_KEY, JSON.stringify(db));
+    safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
+
+    if (isTelegramCloud) {
+      if (changedDate && db[changedDate]) {
+        syncKeyToTelegramCloud(TG_DAY_PREFIX + changedDate, JSON.stringify(db[changedDate]));
+      }
+      if (syncTags) {
+        syncKeyToTelegramCloud(TG_TAGS_KEY, JSON.stringify(customTags));
+      }
+    }
+
+    if (customMessage) {
+      setStatusBadge(customMessage);
+      return;
+    }
+    if (!isTelegramCloud) {
+      const modeText = storageAvailable ? 'Локальная память' : 'ОЗУ-режим';
+      setStatusBadge('🟢 JS Активен · Сохранено (' + modeText + ') ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    }
+  }
+
+  function saveDB(customMessage) {
+    safeSetItem(STORAGE_KEY, JSON.stringify(db));
+    safeSetItem(CUSTOM_TAGS_KEY, JSON.stringify(customTags));
+    const badge = document.getElementById('saveBadge');
+    badge.className = 'save-indicator ok';
+    if (customMessage) {
+      badge.textContent = customMessage;
+      return;
+    }
+    const modeText = storageAvailable ? 'Локальная память' : 'ОЗУ-режим';
+    badge.textContent = '🟢 JS Активен · Сохранено (' + modeText + ') ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  function getEntry(dateStr) {
+    if (!db[dateStr]) db[dateStr] = defaultEntry(dateStr);
+    return db[dateStr];
+  }
+
+  // Алгоритмы клинической детекции фаз
+  function isMixedState(e) {
+    const delta = e.energy - e.mood;
+    return (e.mood <= -1 && e.energy >= 1) || (e.mood <= -1 && (e.irritability >= 2 || e.anxiety >= 2)) || (delta >= 2.5 && e.mood < 0);
+  }
+
+  function isHypoProdrome(e) {
+    return (e.sleepHours < 5.5 && e.energy >= 1) || e.sleepTags.indexOf('no_need_sleep') !== -1 || (e.mood >= 1.5 && e.energy >= 1.5);
+  }
+
+  // Отрисовка экрана чек-ина
+  function renderCheckin() {
+    const entry = getEntry(currentDate);
+    document.getElementById('currentDateInput').value = currentDate;
+    document.getElementById('moodSlider').value = entry.mood;
+    document.getElementById('energySlider').value = entry.energy;
+    document.getElementById('moodLabel').textContent = MOOD_DESC[String(entry.mood)] || entry.mood;
+    document.getElementById('energyLabel').textContent = ENERGY_DESC[String(entry.energy)] || entry.energy;
+
+    renderSeg('irritabilitySeg', entry.irritability);
+    renderSeg('anxietySeg', entry.anxiety);
+
+    const shEl = document.getElementById('sleepHoursDisplay');
+    shEl.textContent = entry.sleepHours.toFixed(1) + ' ч';
+    shEl.style.color = entry.sleepHours < 5.5 ? '#d97706' : (entry.sleepHours >= 10 ? '#2563eb' : 'var(--ink)');
+
+    document.getElementById('bedTimeInput').value = entry.bedTime || '23:30';
+    document.getElementById('wakeTimeInput').value = entry.wakeTime || '07:00';
+
+    renderChips('sleepTagsWrap', SLEEP_TAGS, entry.sleepTags, 'sleepTags', '');
+    renderChips('hypoTagsWrap', HYPO_TAGS.concat(customTags), entry.phaseTags, 'phaseTags', 'hypo');
+    renderChips('deprTagsWrap', DEPR_TAGS, entry.phaseTags, 'phaseTags', 'depr');
+    renderChips('safetyTagsWrap', SAFETY_TAGS, entry.safetyTags, 'safetyTags', 'danger');
+    renderChips('triggerTagsWrap', TRIGGER_TAGS, entry.triggers, 'triggers', '');
+
+    document.getElementById('medFull').className = 'med-btn' + (entry.meds === 'full' ? ' active-full' : '');
+    document.getElementById('medPart').className = 'med-btn' + (entry.meds === 'partial' ? ' active-part' : '');
+    document.getElementById('medMissed').className = 'med-btn' + (entry.meds === 'missed' ? ' active-missed' : '');
+    document.getElementById('notesInput').value = entry.notes || '';
+
+    document.getElementById('mixedAlert').classList.toggle('show', isMixedState(entry));
+    document.getElementById('hypoAlert').classList.toggle('show', isHypoProdrome(entry));
+    const hasSafety = entry.safetyTags.indexOf('passive_si') !== -1 || entry.safetyTags.indexOf('active_si') !== -1;
+    document.getElementById('safetyAlert').classList.toggle('show', hasSafety);
+  }
+
+  function renderSeg(containerId, activeVal) {
+    const btns = document.getElementById(containerId).querySelectorAll('.seg-btn');
+    btns.forEach((btn, idx) => {
+      btn.className = 'seg-btn' + (idx === activeVal ? ' active-' + idx : '');
+    });
+  }
+
+  function renderChips(containerId, list, selectedArr, fieldName, extraClass) {
+    const wrap = document.getElementById(containerId);
+    wrap.innerHTML = '';
+    list.forEach(item => {
+      const isSelected = selectedArr.indexOf(item.id) !== -1;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const cls = item.danger ? 'danger' : extraClass;
+      btn.className = 'chip ' + cls + (isSelected ? ' active' : '');
+      btn.textContent = item.label;
+      btn.addEventListener('click', function() {
+        const entry = getEntry(currentDate);
+        const arr = entry[fieldName];
+        const idx = arr.indexOf(item.id);
+        if (idx === -1) arr.push(item.id);
+        else arr.splice(idx, 1);
+        tgHaptic('selection');
+        saveDB(null, currentDate);
+        renderCheckin();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  // Отрисовка KPI и векторного графика NIMH (Inline SVG)
+  function renderAnalytics() {
+    const dates = Object.keys(db).sort().slice(-chartDaysRange);
+    const entries = dates.map(d => db[d]);
+
+    const avgSleep = entries.length ? (entries.reduce((s, e) => s + e.sleepHours, 0) / entries.length).toFixed(1) : 0;
+    const fullMeds = entries.filter(e => e.meds === 'full').length;
+    const adherence = entries.length ? Math.round((fullMeds / entries.length) * 100) : 100;
+    const mixedDays = entries.filter(isMixedState).length;
+    const hypoDays = entries.filter(isHypoProdrome).length;
+
+    document.getElementById('kpiContainer').innerHTML =
+      '<div class="kpi-card"><div class="kpi-label">Средний сон (' + entries.length + ' дн.)</div><div class="kpi-val">' + avgSleep + ' ч</div></div>' +
+      '<div class="kpi-card"><div class="kpi-label">Комплаенс терапии</div><div class="kpi-val">' + adherence + '%</div></div>' +
+      '<div class="kpi-card"><div class="kpi-label">Дней со смеш. фазой</div><div class="kpi-val">' + mixedDays + '</div></div>' +
+      '<div class="kpi-card"><div class="kpi-label">Маркеров гипомании</div><div class="kpi-val">' + hypoDays + '</div></div>';
+
+    const width = Math.max(660, entries.length * 38);
+    const height = 340, padL = 42, padR = 24, padT = 20, chartH = 190, sleepTop = 235, sleepH = 70;
+    const getX = (i) => entries.length <= 1 ? (width / 2) : (padL + (i / (entries.length - 1)) * (width - padL - padR));
+    const getY = (val) => padT + ((3 - val) / 6) * chartH;
+
+    let svg = '<svg width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" xmlns="http://www.w3.org/2000/svg">';
+    for (let v = -3; v <= 3; v++) {
+      const y = getY(v);
+      svg += '<line x1="' + padL + '" y1="' + y + '" x2="' + (width - padR) + '" y2="' + y + '" stroke="' + (v === 0 ? '#64748b' : '#2a2a2e') + '" stroke-width="' + (v === 0 ? 1.5 : 1) + '" />';
+      svg += '<text x="' + (padL - 8) + '" y="' + (y + 4) + '" fill="#94a3b8" font-size="11" text-anchor="end">' + (v > 0 ? '+' + v : v) + '</text>';
+    }
+
+    const barW = Math.min(22, (width - padL - padR) / Math.max(1, entries.length) * 0.65);
+    entries.forEach((e, i) => {
+      const x = getX(i);
+      if (isMixedState(e)) {
+        svg += '<rect x="' + (x - barW/2 - 3) + '" y="' + padT + '" width="' + (barW + 6) + '" height="' + chartH + '" fill="rgba(239,68,68,0.18)" rx="4" />';
+      }
+      const bH = (Math.min(14, e.sleepHours) / 14) * sleepH;
+      const bY = sleepTop + (sleepH - bH);
+      const barColor = e.sleepHours < 5.5 ? '#f97316' : (e.sleepHours >= 10 ? '#818cf8' : '#38bdf8');
+      svg += '<rect x="' + (x - barW/2) + '" y="' + bY + '" width="' + barW + '" height="' + bH + '" fill="' + barColor + '" opacity="0.65" rx="3" />';
+      svg += '<text x="' + x + '" y="' + (bY - 4) + '" fill="#cbd5e1" font-size="9.5" text-anchor="middle">' + e.sleepHours + '</text>';
+      svg += '<text x="' + x + '" y="' + (height - 8) + '" fill="#94a3b8" font-size="10" text-anchor="middle">' + e.date.slice(8,10) + '.' + e.date.slice(5,7) + '</text>';
+    });
+
+    if (entries.length > 1) {
+      const mPts = entries.map((e, i) => getX(i) + ',' + getY(e.mood)).join(' ');
+      const ePts = entries.map((e, i) => getX(i) + ',' + getY(e.energy)).join(' ');
+      svg += '<polyline fill="none" stroke="#60a5fa" stroke-width="3" points="' + mPts + '" />';
+      svg += '<polyline fill="none" stroke="#f59e0b" stroke-width="2.5" stroke-dasharray="5,3" points="' + ePts + '" />';
+    }
+
+    entries.forEach((e, i) => {
+      const x = getX(i);
+      svg += '<circle cx="' + x + '" cy="' + getY(e.mood) + '" r="5" fill="' + (isMixedState(e) ? '#ef4444' : '#60a5fa') + '" />';
+      svg += '<circle cx="' + x + '" cy="' + getY(e.energy) + '" r="4.5" fill="#f59e0b" />';
+    });
+    svg += '</svg>';
+    document.getElementById('svgChartBox').innerHTML = svg;
+  }
+
+  // Отрисовка таблицы отчета для врача
+  function renderReportTable() {
+    const tbody = document.querySelector('#reportTable tbody');
+    const dates = Object.keys(db).sort().reverse();
+    document.getElementById('totalDaysCount').textContent = dates.length;
+
+    const allTagMap = {};
+    SLEEP_TAGS.concat(HYPO_TAGS, DEPR_TAGS, SAFETY_TAGS, TRIGGER_TAGS, customTags).forEach(t => { allTagMap[t.id] = t.label; });
+    const medsMap = { full: '✅ Полностью', partial: '⚠️ Частично', missed: '❌ Пропуск' };
+
+    tbody.innerHTML = dates.map(d => {
+      const e = db[d];
+      const mixed = isMixedState(e);
+      const tags = e.sleepTags.concat(e.phaseTags, e.safetyTags, e.triggers).map(id => allTagMap[id] || id).join(', ');
+      return '<tr style="' + (mixed ? 'background:rgba(224,79,51,0.08)' : '') + '">' +
+        '<td><strong>' + e.date + '</strong> ' + (mixed ? '⚠️' : '') + '</td>' +
+        '<td style="color:#2563eb;font-weight:700;">' + (e.mood > 0 ? '+' + e.mood : e.mood) + '</td>' +
+        '<td style="color:#c2410c;font-weight:700;">' + (e.energy > 0 ? '+' + e.energy : e.energy) + '</td>' +
+        '<td>Р:' + e.irritability + ' / Т:' + e.anxiety + '</td>' +
+        '<td>' + e.sleepHours + ' ч <span style="color:var(--text-muted);font-size:0.72rem;">(' + (e.bedTime || '23:30') + '–' + (e.wakeTime || '07:00') + ')</span></td>' +
+        '<td>' + (medsMap[e.meds] || e.meds) + '</td>' +
+        '<td>' + (tags ? '<div>' + tags + '</div>' : '') + (e.notes ? '<div style="color:var(--text-muted);font-style:italic;">«' + e.notes + '»</div>' : '') + '</td></tr>';
+    }).join('');
+  }
+
+  // Привязка обработчиков событий
+  function bindEvents() {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        tgHaptic('selection');
+        const tab = this.getAttribute('data-tab');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        document.getElementById('view-' + tab).classList.add('active');
+        if (tab === 'chart') renderAnalytics();
+        if (tab === 'report') renderReportTable();
+      });
+    });
+
+    document.getElementById('prevDayBtn').addEventListener('click', function() {
+      tgHaptic('light');
+      const d = new Date(currentDate + 'T12:00:00');
+      d.setDate(d.getDate() - 1);
+      currentDate = formatDateISO(d);
+      renderCheckin();
+    });
+
+    document.getElementById('nextDayBtn').addEventListener('click', function() {
+      tgHaptic('light');
+      const d = new Date(currentDate + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      currentDate = formatDateISO(d);
+      renderCheckin();
+    });
+
+    document.getElementById('currentDateInput').addEventListener('change', function() {
+      if (this.value) { currentDate = this.value; renderCheckin(); }
+    });
+
+    document.getElementById('zeroModeBtn').addEventListener('click', function() {
+      tgHaptic('light');
+      zeroMode = !zeroMode;
+      this.classList.toggle('active', zeroMode);
+      document.querySelectorAll('.extra-block').forEach(el => {
+        el.style.display = zeroMode ? 'none' : '';
+      });
+    });
+
+    document.getElementById('moodSlider').addEventListener('input', function() {
+      getEntry(currentDate).mood = parseFloat(this.value);
+      saveDB(null, currentDate);
+      renderCheckin();
+    });
+
+    document.getElementById('energySlider').addEventListener('input', function() {
+      getEntry(currentDate).energy = parseFloat(this.value);
+      saveDB(null, currentDate);
+      renderCheckin();
+    });
+
+    document.querySelectorAll('#irritabilitySeg .seg-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        tgHaptic('selection');
+        getEntry(currentDate).irritability = parseInt(this.getAttribute('data-val'), 10);
+        saveDB(null, currentDate);
+        renderCheckin();
+      });
+    });
+
+    document.querySelectorAll('#anxietySeg .seg-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        tgHaptic('selection');
+        getEntry(currentDate).anxiety = parseInt(this.getAttribute('data-val'), 10);
+        saveDB(null, currentDate);
+        renderCheckin();
+      });
+    });
+
+    document.getElementById('sleepMinusBtn').addEventListener('click', function() {
+      tgHaptic('light');
+      const e = getEntry(currentDate);
+      e.sleepHours = Math.max(0, e.sleepHours - 0.5);
+      saveDB(null, currentDate);
+      renderCheckin();
+    });
+
+    document.getElementById('sleepPlusBtn').addEventListener('click', function() {
+      tgHaptic('light');
+      const e = getEntry(currentDate);
+      e.sleepHours = Math.min(18, e.sleepHours + 0.5);
+      saveDB(null, currentDate);
+      renderCheckin();
+    });
+
+    function recalcSleepTime() {
+      const e = getEntry(currentDate);
+      const bt = document.getElementById('bedTimeInput').value;
+      const wt = document.getElementById('wakeTimeInput').value;
+      e.bedTime = bt; e.wakeTime = wt;
+      if (bt && wt) {
+        const bParts = bt.split(':').map(Number);
+        const wParts = wt.split(':').map(Number);
+        let bMin = bParts[0] * 60 + bParts[1];
+        let wMin = wParts[0] * 60 + wParts[1];
+        if (wMin <= bMin) wMin += 1440;
+        const hrs = Math.round(((wMin - bMin) / 60) * 2) / 2;
+        if (hrs > 0 && hrs <= 18) e.sleepHours = hrs;
+      }
+      saveDB(null, currentDate);
+      renderCheckin();
+    }
+    document.getElementById('bedTimeInput').addEventListener('change', recalcSleepTime);
+    document.getElementById('wakeTimeInput').addEventListener('change', recalcSleepTime);
+
+    document.getElementById('addCustomTagBtn').addEventListener('click', function() {
+      const inp = document.getElementById('customTagInput');
+      const txt = inp.value.trim();
+      if (!txt) return;
+      tgHaptic('light');
+      const id = 'custom_' + Date.now();
+      customTags.push({ id: id, label: '✨ ' + txt });
+      inp.value = '';
+      getEntry(currentDate).phaseTags.push(id);
+      saveDB(null, currentDate, true);
+      renderCheckin();
+    });
+
+    document.querySelectorAll('.med-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        tgHaptic('selection');
+        getEntry(currentDate).meds = this.getAttribute('data-med');
+        saveDB(null, currentDate);
+        renderCheckin();
+      });
+    });
+
+    document.getElementById('notesInput').addEventListener('input', function() {
+      getEntry(currentDate).notes = this.value;
+      saveDB(null, currentDate);
+    });
+
+    document.getElementById('range14Btn').addEventListener('click', function() { chartDaysRange = 14; renderAnalytics(); });
+    document.getElementById('range30Btn').addEventListener('click', function() { chartDaysRange = 30; renderAnalytics(); });
+    document.getElementById('printBtn').addEventListener('click', function() { window.print(); });
+
+    document.getElementById('resetDemoBtn').addEventListener('click', function() {
+      tgHaptic('medium');
+      loadDemoData(true);
+      renderCheckin();
+      renderAnalytics();
+      renderReportTable();
+      saveDB('🔄 Загружен 21-дневный демо-сценарий');
+      syncAllToTelegramCloud();
+    });
+    });
+
+    document.getElementById('prevDayBtn').addEventListener('click', function() {
+      const d = new Date(currentDate + 'T12:00:00');
+      d.setDate(d.getDate() - 1);
+      currentDate = formatDateISO(d);
+      renderCheckin();
+    });
+
+    document.getElementById('nextDayBtn').addEventListener('click', function() {
+      const d = new Date(currentDate + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      currentDate = formatDateISO(d);
+      renderCheckin();
+    });
+
+    document.getElementById('currentDateInput').addEventListener('change', function() {
+      if (this.value) { currentDate = this.value; renderCheckin(); }
+    });
+
+    document.getElementById('zeroModeBtn').addEventListener('click', function() {
+      zeroMode = !zeroMode;
+      this.classList.toggle('active', zeroMode);
+      document.querySelectorAll('.extra-block').forEach(el => {
+        el.style.display = zeroMode ? 'none' : '';
+      });
+    });
+
+    document.getElementById('moodSlider').addEventListener('input', function() {
+      getEntry(currentDate).mood = parseFloat(this.value);
+      saveDB();
+      renderCheckin();
+    });
+
+    document.getElementById('energySlider').addEventListener('input', function() {
+      getEntry(currentDate).energy = parseFloat(this.value);
+      saveDB();
+      renderCheckin();
+    });
+
+    document.querySelectorAll('#irritabilitySeg .seg-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        getEntry(currentDate).irritability = parseInt(this.getAttribute('data-val'), 10);
+        saveDB();
+        renderCheckin();
+      });
+    });
+
+    document.querySelectorAll('#anxietySeg .seg-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        getEntry(currentDate).anxiety = parseInt(this.getAttribute('data-val'), 10);
+        saveDB();
+        renderCheckin();
+      });
+    });
+
+    document.getElementById('sleepMinusBtn').addEventListener('click', function() {
+      const e = getEntry(currentDate);
+      e.sleepHours = Math.max(0, e.sleepHours - 0.5);
+      saveDB();
+      renderCheckin();
+    });
+
+    document.getElementById('sleepPlusBtn').addEventListener('click', function() {
+      const e = getEntry(currentDate);
+      e.sleepHours = Math.min(18, e.sleepHours + 0.5);
+      saveDB();
+      renderCheckin();
+    });
+
+    function recalcSleepTime() {
+      const e = getEntry(currentDate);
+      const bt = document.getElementById('bedTimeInput').value;
+      const wt = document.getElementById('wakeTimeInput').value;
+      e.bedTime = bt; e.wakeTime = wt;
+      if (bt && wt) {
+        const bParts = bt.split(':').map(Number);
+        const wParts = wt.split(':').map(Number);
+        let bMin = bParts[0] * 60 + bParts[1];
+        let wMin = wParts[0] * 60 + wParts[1];
+        if (wMin <= bMin) wMin += 1440;
+        const hrs = Math.round(((wMin - bMin) / 60) * 2) / 2;
+        if (hrs > 0 && hrs <= 18) e.sleepHours = hrs;
+      }
+      saveDB();
+      renderCheckin();
+    }
+    document.getElementById('bedTimeInput').addEventListener('change', recalcSleepTime);
+    document.getElementById('wakeTimeInput').addEventListener('change', recalcSleepTime);
+
+    document.getElementById('addCustomTagBtn').addEventListener('click', function() {
+      const inp = document.getElementById('customTagInput');
+      const txt = inp.value.trim();
+      if (!txt) return;
+      const id = 'custom_' + Date.now();
+      customTags.push({ id: id, label: '✨ ' + txt });
+      inp.value = '';
+      getEntry(currentDate).phaseTags.push(id);
+      saveDB();
+      renderCheckin();
+    });
+
+    document.querySelectorAll('.med-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        getEntry(currentDate).meds = this.getAttribute('data-med');
+        saveDB();
+        renderCheckin();
+      });
+    });
+
+    document.getElementById('notesInput').addEventListener('input', function() {
+      getEntry(currentDate).notes = this.value;
+      saveDB();
+    });
+
+    document.getElementById('range14Btn').addEventListener('click', function() { chartDaysRange = 14; renderAnalytics(); });
+    document.getElementById('range30Btn').addEventListener('click', function() { chartDaysRange = 30; renderAnalytics(); });
+    document.getElementById('printBtn').addEventListener('click', function() { window.print(); });
+
+    document.getElementById('resetDemoBtn').addEventListener('click', function() {
+      loadDemoData(true);
+      renderCheckin();
+      renderAnalytics();
+      renderReportTable();
+      saveDB('🔄 Загружен 21-дневный демо-сценарий');
+    });
+
+    const clearBtn = document.getElementById('clearDbBtn');
+    clearBtn.addEventListener('click', function() {
+      if (!this.classList.contains('confirming')) {
+        this.classList.add('confirming');
+        this.textContent = '⚠️ Точно очистить всё? Нажмите еще раз (5 сек)';
+        if (clearConfirmTimeout) clearTimeout(clearConfirmTimeout);
+        clearConfirmTimeout = setTimeout(() => {
+          this.classList.remove('confirming');
+          this.textContent = '🗑️ Очистить всю базу с нуля';
+        }, 5000);
+      } else {
+        if (clearConfirmTimeout) clearTimeout(clearConfirmTimeout);
+        this.classList.remove('confirming');
+        this.textContent = '🗑️ Очистить всю базу с нуля';
+        clearDatabaseFromScratch();
+      }
+    });
+
+    document.getElementById('jsonImportInput').addEventListener('change', function(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed && parsed.db) {
+            db = parsed.db;
+            customTags = parsed.customTags || [];
+            safeSetItem(CLEARED_FLAG_KEY, 'false');
+            saveDB('📂 Бэкап базы успешно загружен!');
+            syncAllToTelegramCloud();
+            renderCheckin();
+            renderAnalytics();
+            renderReportTable();
+          }
+        } catch (err) {
+          saveDB('❌ Ошибка чтения JSON файла');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    document.getElementById('csvBtn').addEventListener('click', function() {
+      const headers = ['Date','Mood','Energy','Mixed','Irritability','Anxiety','SleepHours','BedTime','WakeTime','Meds','Notes'];
+      const rows = Object.keys(db).sort().map(d => {
+        const e = db[d];
+        return [e.date, e.mood, e.energy, isMixedState(e)?'YES':'NO', e.irritability, e.anxiety, e.sleepHours, e.bedTime||'23:30', e.wakeTime||'07:00', e.meds, '"' + (e.notes||'').replace(/"/g,'""') + '"'].join(',');
+      });
+      const blob = new Blob(['\uFEFF' + headers.join(',') + '\n' + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'bar2_report_' + currentDate + '.csv';
+      a.click();
+    });
+
+    document.getElementById('jsonExportBtn').addEventListener('click', function() {
+      const blob = new Blob([JSON.stringify({ db: db, customTags: customTags }, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'bar2_backup_' + currentDate + '.json';
+      a.click();
+    });
+  }
+
+  // Старт приложения
+  loadDemoData(false);
+  saveDB(isTelegramCloud ? '✈️ Telegram Cloud · Подключение...' : '🟢 JS Активен · База загружена');
+  bindEvents();
+  renderCheckin();
+  renderAnalytics();
+  renderReportTable();
+  // Если запущено внутри Telegram Mini App — подтягиваем актуальные записи из облака Telegram
+  if (isTelegramCloud) {
+    hydrateFromTelegramCloud();
+  }
+})();
+</script>
+</body>
+</html>
